@@ -1,0 +1,9 @@
+{
+  "recommendations": [
+    "ms-vscode-remote.remote-containers",
+    "Shopify.ruby-lsp",
+    "sorbet.sorbet-vscode-extension",
+    "DavidAnson.vscode-markdownlint",
+    "bierner.markdown-mermaid"
+  ]
+}

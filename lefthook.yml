@@ -1,0 +1,29 @@
+# Fast checks before a commit, the full suite before a push. Mutation testing
+# and the dependency checks (bundler-audit, ruby-audit, license_finder) are
+# deliberately absent: they are slow and network-bound, and belong in CI, not
+# between you and a commit.
+pre-commit:
+  parallel: true
+  jobs:
+    - name: rubocop
+      glob: '*.rb'
+      run: bundle exec rubocop --force-exclusion {staged_files}
+
+    - name: typecheck
+      glob: '*.rb'
+      run: bundle exec srb tc
+
+    - name: markdownlint
+      glob: '*.md'
+      run: markdownlint-cli2 {staged_files}
+
+    - name: typos
+      run: typos {staged_files}
+
+pre-push:
+  jobs:
+    - name: spec
+      run: bundle exec rspec
+
+    - name: doc-coverage
+      run: bundle exec rake doc:coverage

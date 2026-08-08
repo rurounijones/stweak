@@ -1,0 +1,7 @@
+---
+# license_finder configuration. The permitted licences and the per-gem
+# approvals are not here: those are decisions, each recorded with the reason it
+# was made, and they live in the decisions file below. This file only points at
+# that file, because the default location (doc/) is git-ignored generated output
+# in this project.
+decisions_file: config/dependency_decisions.yml

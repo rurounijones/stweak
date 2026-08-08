@@ -1,0 +1,51 @@
+---
+- - :permit
+  - MIT
+  - :who:
+    :why: Permissive; imposes no conditions on a project released under the AGPL.
+    :versions: []
+    :when: 2026-08-26 11:01:09.991231052 Z
+- - :permit
+  - Apache 2.0
+  - :who:
+    :why: Permissive; compatible with the AGPL.
+    :versions: []
+    :when: 2026-08-26 11:01:10.251222677 Z
+- - :permit
+  - Simplified BSD
+  - :who:
+    :why: Permissive (2-clause BSD); the licence of many Ruby stdlib gems.
+    :versions: []
+    :when: 2026-08-26 11:01:10.466448427 Z
+- - :permit
+  - ruby
+  - :who:
+    :why: The Ruby licence, carried by many stdlib gems; permissive.
+    :versions: []
+    :when: 2026-08-26 11:01:10.692839261 Z
+- - :permit
+  - GPL-3.0-or-later
+  - :who:
+    :why: Only ruby_audit, a development-only audit tool; GPLv3 is compatible with
+      this project's AGPLv3.
+    :versions: []
+    :when: 2026-08-26 11:01:10.906738928 Z
+- - :permit
+  - AGPL-3.0-or-later
+  - :who:
+    :why: This project's own licence, reported by the stweak gem itself.
+    :versions: []
+    :when: 2026-08-26 11:01:11.121957469 Z
+- - :approve
+  - mutant
+  - :who:
+    :why: gemspec declares a non-SPDX licence; development-only, used under its documented
+      open-source usage (mutant run --usage opensource).
+    :versions: []
+    :when: 2026-08-26 11:01:11.348115886 Z
+- - :approve
+  - mutant-rspec
+  - :who:
+    :why: 'As mutant: non-SPDX gemspec licence, development-only, open-source usage.'
+    :versions: []
+    :when: 2026-08-26 11:01:11.561242261 Z
