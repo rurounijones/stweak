@@ -1,0 +1,25 @@
+config:
+  # Prose in this repository wraps at 80 columns by hand. Code blocks and
+  # tables are exempt, since wrapping those changes their meaning.
+  MD013:
+    line_length: 80
+    code_blocks: false
+    tables: false
+    headings: true
+
+  # The README uses a mermaid fence and inline HTML is not otherwise needed.
+  MD033: false
+
+  # Duplicate headings are fine when nested under different parents, which
+  # this document does not currently do but is likely to.
+  MD024:
+    siblings_only: true
+
+globs:
+  - '**/*.md'
+
+ignores:
+  - 'doc/**'
+  - 'sorbet/**'
+  - 'vendor/**'
+  - 'node_modules/**'

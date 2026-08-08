@@ -1,0 +1,30 @@
+{
+  "name": "stweak",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "workspaceFolder": "/workspaces/stweak",
+  "mounts": [
+    "source=stweak-bundle,target=/usr/local/bundle,type=volume"
+  ],
+  "remoteEnv": {
+    "BUNDLE_PATH": "/usr/local/bundle"
+  },
+  "postCreateCommand": "git config --global --add safe.directory /workspaces/stweak && bundle install && lefthook install",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "Shopify.ruby-lsp",
+        "sorbet.sorbet-vscode-extension",
+        "DavidAnson.vscode-markdownlint",
+        "bierner.markdown-mermaid"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true,
+        "rubyLsp.formatter": "rubocop"
+      }
+    }
+  }
+}

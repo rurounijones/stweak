@@ -1,0 +1,26 @@
+# Bundler
+/.bundle/
+/vendor/bundle/
+Gemfile.lock
+
+# Test and coverage output
+/coverage/
+/spec/reports/
+/tmp/
+
+# Mutant session results
+/.mutant/
+
+# Generated documentation
+/doc/
+/.yardoc/
+
+# Sorbet caches and generated RBIs. Shims are hand written and kept.
+/sorbet/rbi/gems/
+/sorbet/rbi/dsl/
+/sorbet/rbi/annotations/
+/sorbet/cache/
+
+# Editors and OS
+.DS_Store
+*.swp
