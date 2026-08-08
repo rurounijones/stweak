@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Unit testing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        # The version is read from .ruby-version, keeping the workflow in step
+        # with the devcontainer's declared Ruby.
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Run the test suite
+        run: bundle exec rake spec
+
+  static:
+    name: Static checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      # The fast checks that `rake` bundles together, minus the specs (which
+      # have their own job), so each concern is visible in the UI on its own.
+      - name: Run RuboCop, Sorbet and YARD checks
+        run: bundle exec rake rubocop typecheck doc:coverage doc:lint
+
+  mutant:
+    name: Mutation testing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Run mutation testing
+        run: bundle exec rake mutant
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Check dependencies for known vulnerabilities
+        run: bundle exec rake audit
+
+  docs:
+    name: Documentation lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install markdownlint-cli2
+        run: npm install --global --no-audit --no-fund markdownlint-cli2@0.23.2
+
+      - name: Lint Markdown
+        run: markdownlint-cli2 "**/*.md"
+
+      # Downloaded exactly as .devcontainer/Dockerfile does, pinned to the same
+      # version, so the container and CI stay provably in step.
+      - name: Install typos
+        run: |
+          curl -fsSL \
+            "https://github.com/crate-ci/typos/releases/download/v1.49.0/typos-v1.49.0-x86_64-unknown-linux-musl.tar.gz" \
+            | tar -xz -C /usr/local/bin ./typos
+
+      - name: Check for typos
+        run: typos
+
+  actionlint:
+    name: Validate workflow files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      # Downloaded exactly as .devcontainer/Dockerfile does, pinned to the same
+      # version, so the container and CI stay provably in step.
+      - name: Install actionlint
+        # actionlint is a Go binary, so its release assets use Go's arch
+        # naming (amd64/arm64) rather than the Rust triple naming the typos
+        # download above uses.
+        run: |
+          curl -fsSL \
+            "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin actionlint
+
+      - name: Validate workflow files
+        run: actionlint

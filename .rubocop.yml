@@ -1,0 +1,30 @@
+plugins:
+  - rubocop-performance
+  - rubocop-rake
+  - rubocop-rspec
+  - rubocop-sorbet
+
+AllCops:
+  TargetRubyVersion: 3.4
+  NewCops: enable
+  SuggestExtensions: false
+  Exclude:
+    - 'sorbet/**/*'
+    - 'vendor/**/*'
+
+# Defaults are kept deliberately. Every disabled cop is an argument that the
+# community default is wrong for this project, and the project should have to
+# make that argument one cop at a time rather than inherit a list of them.
+#
+# The two below are the only exceptions so far.
+
+# Signatures sit between the doc comment and the method, which this cop reads
+# as a missing blank line. rubocop-sorbet's own guidance is to allow it.
+Layout/EmptyLineBetweenDefs:
+  AllowAdjacentOneLineDefs: true
+
+# The gemspec description is a heredoc, which this cop cannot see the end of.
+Metrics/BlockLength:
+  Exclude:
+    - '*.gemspec'
+    - 'spec/**/*_spec.rb'

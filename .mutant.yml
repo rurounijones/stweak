@@ -1,0 +1,16 @@
+---
+includes:
+  - lib
+requires:
+  - stweak
+integration:
+  name: rspec
+matcher:
+  subjects:
+    - Stweak*
+coverage_criteria:
+  timeout: false
+  process_abort: false
+  test_result: true
+mutation:
+  operators: full

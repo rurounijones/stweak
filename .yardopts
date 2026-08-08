@@ -1,0 +1,10 @@
+--markup markdown
+--markup-provider redcarpet
+--no-private
+--plugin sorbet
+--readme README.md
+--output-dir doc
+lib/**/*.rb
+-
+CHANGELOG.md
+LICENSE
