@@ -16,7 +16,7 @@ AllCops:
 # community default is wrong for this project, and the project should have to
 # make that argument one cop at a time rather than inherit a list of them.
 #
-# The two below are the only exceptions so far.
+# The exceptions below are the deliberate few.
 
 # Signatures sit between the doc comment and the method, which this cop reads
 # as a missing blank line. rubocop-sorbet's own guidance is to allow it.
@@ -28,3 +28,11 @@ Metrics/BlockLength:
   Exclude:
     - '*.gemspec'
     - 'spec/**/*_spec.rb'
+
+# The app area keeps each bundle's specs in that bundle's own spec/ directory,
+# because each driver is a separate application with its own bundle. The spec
+# path therefore reflects the bundle, not the class namespace, and the cop's
+# path-mirrors-namespace rule cannot hold there.
+RSpec/SpecFilePathFormat:
+  Exclude:
+    - 'app/**/spec/**/*'
