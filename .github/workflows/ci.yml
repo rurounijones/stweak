@@ -26,6 +26,45 @@ jobs:
       - name: Run the test suite
         run: bundle exec rake spec
 
+  app:
+    name: App adapters and drivers
+    runs-on: ubuntu-latest
+    # The real-technology adapters need the same services the devcontainer
+    # provides: DynamoDB Local, ElasticMQ, and Redis. SQLite needs no service.
+    services:
+      dynamodb-local:
+        image: amazon/dynamodb-local:latest
+        ports:
+          - 8000:8000
+      elasticmq:
+        image: softwaremill/elasticmq-native:latest
+        ports:
+          - 9324:9324
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Install the adapters bundle
+        run: cd app/adapters && bundle install
+
+      - name: Run the adapters specs
+        run: cd app/adapters && bundle exec rspec
+
+      - name: Install the data generator bundle
+        run: cd app/drivers/data_generator && bundle install
+
+      - name: Run the data generator specs
+        run: cd app/drivers/data_generator && bundle exec rspec
+
   static:
     name: Static checks
     runs-on: ubuntu-latest

@@ -1,16 +1,12 @@
 {
   "name": "stweak",
-  "build": {
-    "dockerfile": "Dockerfile"
-  },
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "dev",
   "workspaceFolder": "/workspaces/stweak",
-  "mounts": [
-    "source=stweak-bundle,target=/usr/local/bundle,type=volume"
-  ],
   "remoteEnv": {
     "BUNDLE_PATH": "/usr/local/bundle"
   },
-  "postCreateCommand": "git config --global --add safe.directory /workspaces/stweak && bundle install && lefthook install",
+  "postCreateCommand": "git config --global --add safe.directory /workspaces/stweak && bundle install && (cd app/adapters && bundle install) && (cd app/drivers/data_generator && bundle install) && lefthook install",
   "customizations": {
     "vscode": {
       "extensions": [
