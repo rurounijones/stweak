@@ -25,3 +25,6 @@ Gemfile.lock
 # Editors and OS
 .DS_Store
 *.swp
+
+# SQLite files created by the data generator
+*.db

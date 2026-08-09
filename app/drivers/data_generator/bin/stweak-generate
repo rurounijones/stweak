@@ -1,0 +1,16 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Generate plausible account-creation events in volume. Adapter selection and
+# connection settings come from the shared drivers .env (see
+# ../../.env.example); dotenv only populates ENV, which the wiring reads with
+# ENV.fetch. Usage: stweak-generate [count]
+
+require 'dotenv'
+Dotenv.load(File.expand_path('../../../.env', __dir__))
+
+require_relative '../lib/wiring'
+
+count = Integer(ARGV.fetch(0, '100'))
+accounts = DataGenerator::Wiring.build.run(count)
+puts "Created #{accounts.length} accounts"
