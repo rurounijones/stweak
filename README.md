@@ -379,12 +379,16 @@ runs, and constructor validation pins down whether that shape is a legal one at
 the moment it is filled in. Between the two, by the time a handler receives a
 command, both its type and the validity of its contents are already settled.
 
-None of this replaces the checks an aggregate makes against current state.
-Whether a command is well-formed is one question, and whether it is allowed,
-such as whether that account name is taken or that player may be banned, is
-another, answered at handling time against the aggregate. This decision
-guarantees that the first question never goes unanswered, because a broken
-object cannot be built.
+None of this replaces the checks that decide whether a command is allowed.
+Whether a command is well-formed is one question, and whether it is allowed is
+another, and how the second is answered depends on the rule. One that lives
+within a single aggregate — such as an account having already been created —
+is checked by the aggregate itself. One that spans aggregates, such as a
+username being unique across all accounts, cannot be: no single aggregate can
+see the others, so it is checked at handling time against the read model of
+usernames. This
+decision guarantees that the first question never goes unanswered, because a
+broken object cannot be built.
 
 ### Encryption at the event-store boundary
 
