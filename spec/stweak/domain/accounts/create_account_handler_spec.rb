@@ -165,6 +165,12 @@ RSpec.describe Stweak::Domain::Accounts::CreateAccountHandler do
     expect(store.read_stream(owner_type: ACCOUNT_OWNER_TYPE, stream_id: ACCOUNT_ID).length).to eq(1)
   end
 
+  it 'stamps created_at on the appended event' do
+    handler.handle(build_create_account_command(account_id: ACCOUNT_ID))
+    event = store.read_stream(owner_type: ACCOUNT_OWNER_TYPE, stream_id: ACCOUNT_ID).first
+    expect(event.created_at).to be_within(2).of(Time.now)
+  end
+
   it 'stores the username in the event' do
     handler.handle(build_create_account_command(account_id: ACCOUNT_ID))
     expect(store.read_stream(owner_type: ACCOUNT_OWNER_TYPE, stream_id: ACCOUNT_ID).first.username).to eq('alice')
@@ -214,6 +220,18 @@ RSpec.describe Stweak::Domain::Accounts::CreateAccountHandler do
     handler.handle(build_create_account_command(account_id: OTHER_ACCOUNT_ID, username: 'bob'))
     expect { handler.handle(build_create_account_command(account_id: ACCOUNT_ID, username: 'bob')) }
       .to raise_error(Stweak::Domain::Accounts::AccountAlreadyExists)
+  end
+
+  it 'returns the account for a retried create' do
+    created = handler.handle(build_create_account_command(account_id: ACCOUNT_ID))
+    retried = handler.handle(build_create_account_command(account_id: ACCOUNT_ID))
+    expect(account_state(retried)).to eq(account_state(created))
+  end
+
+  it 'does not append a second event for a retried create' do
+    handler.handle(build_create_account_command(account_id: ACCOUNT_ID))
+    handler.handle(build_create_account_command(account_id: ACCOUNT_ID))
+    expect(store.read_stream(owner_type: ACCOUNT_OWNER_TYPE, stream_id: ACCOUNT_ID).length).to eq(1)
   end
 
   it 'surfaces a concurrent append as AccountAlreadyExists' do
