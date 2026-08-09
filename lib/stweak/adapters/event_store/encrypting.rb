@@ -8,6 +8,7 @@ require_relative '../../domain/id'
 require_relative '../../domain/owner_registry'
 require_relative '../../domain/value_missing'
 require_relative '../../ports/event_store'
+require_relative '../../ports/event_subscription'
 require_relative '../../ports/key_store'
 require_relative '../encryption/aes_gcm'
 
@@ -15,6 +16,7 @@ module Stweak
   module Adapters
     module EventStore
       # Decorates an event store with encryption of personal data. On append it
+      # stamps each event's created_at to the moment just before the write and
       # encrypts each PII field before persisting; on read it decrypts them
       # back. The domain emits and receives plaintext and never knows what
       # AES-256-GCM is. Keys are held per owner — a type and an id — created
@@ -22,6 +24,11 @@ module Stweak
       # was shredded under a GDPR erasure — the encrypted fields read back as
       # ValueMissing rather than raising: the data is gone by design, and that
       # is a normal state, not an error.
+      #
+      # When given a subscription, append publishes the stamped plaintext
+      # events it received — subscribers see what the domain wrote, never the
+      # ciphertext. Give the subscription to this store, not to the store
+      # beneath it, so the events are published decrypted and only once.
       #
       # rubocop:disable Metrics/ClassLength -- a decorator that both stores and
       # encrypts; the extra methods are the point of the encryption boundary.
@@ -33,17 +40,21 @@ module Stweak
         # @param store [Stweak::Ports::EventStore] the store to decorate
         # @param cipher [Stweak::Adapters::Encryption::AesGcm]
         # @param key_store [Stweak::Ports::KeyStore]
+        # @param subscription [Stweak::Ports::EventSubscription, nil] the
+        #   channel to publish appends to, or nil to keep the store silent
         sig do
           params(
             store: Stweak::Ports::EventStore,
             cipher: Stweak::Adapters::Encryption::AesGcm,
-            key_store: Stweak::Ports::KeyStore
+            key_store: Stweak::Ports::KeyStore,
+            subscription: T.nilable(Stweak::Ports::EventSubscription)
           ).void
         end
-        def initialize(store:, cipher:, key_store:)
+        def initialize(store:, cipher:, key_store:, subscription: nil)
           @store = store
           @cipher = cipher
           @key_store = key_store
+          @subscription = subscription
         end
 
         # @param owner_type [Class<Stweak::Domain::Aggregate>] the aggregate
@@ -63,12 +74,14 @@ module Stweak
             .void
         end
         def append(owner_type:, stream_id:, expected_version:, events:)
+          stamped = stamp_created_at(events)
           @store.append(
             owner_type: owner_type,
             stream_id: stream_id,
             expected_version: expected_version,
-            events: events.map { |event| encrypt(event) }
+            events: stamped.map { |event| encrypt(event) }
           )
+          @subscription&.publish(events: stamped)
         end
 
         # @param owner_type [Class<Stweak::Domain::Aggregate>] the aggregate
@@ -108,6 +121,19 @@ module Stweak
         # rubocop:enable Naming/BlockForwarding
 
         private
+
+        # A copy of each event with created_at set to the moment just before
+        # the write — the single commit moment shared by the whole batch. The
+        # value the event was built with, defaulted to occurred_at, is
+        # replaced by the true write time.
+        #
+        # @param events [Array<Stweak::Domain::Event>]
+        # @return [Array<Stweak::Domain::Event>]
+        sig { params(events: T::Array[Stweak::Domain::Event]).returns(T::Array[Stweak::Domain::Event]) }
+        def stamp_created_at(events)
+          now = Time.now.iso8601
+          events.map { |event| event.with('created_at' => now) }
+        end
 
         # A copy of the event with every PII field encrypted.
         #
