@@ -1,0 +1,1795 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Player account management for a theoretical online team PvP game.">
+      
+      
+      
+        <link rel="canonical" href="https://rurounijones.github.io/stweak/design-decisions/">
+      
+      
+        <link rel="prev" href="../glossary/">
+      
+      
+        <link rel="next" href="../event-store-ordering/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Design Goals - stweak</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#design-decisions" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="stweak" class="md-header__button md-logo" aria-label="stweak" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            stweak
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Design Goals
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/rurounijones/stweak" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href=".." class="md-tabs__link">
+          
+  
+  
+    
+  
+  Home
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Design
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../changelog/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../LICENSE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  License
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="stweak" class="md-nav__button md-logo" aria-label="stweak" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    stweak
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/rurounijones/stweak" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href=".." class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_1" id="__nav_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Home
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Goals
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Goals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#domain-first-adapters-after" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Domain first, adapters after
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-domains-bar-binds-the-gem-not-the-app-area" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The domain's bar binds the gem, not the app area
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cqrs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CQRS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#event-versioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Event versioning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#concurrency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concurrency
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#explicit-requires-no-autoloading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explicit requires, no autoloading
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#require_relative-for-files-we-own" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        require_relative for files we own
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#static-typing-with-sorbet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Static typing with Sorbet
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#types-over-primitives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Types over primitives
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#errors-are-part-of-the-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Errors are part of the contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#objects-validate-themselves-at-construction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Objects validate themselves at construction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#encryption-at-the-event-store-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Encryption at the event-store boundary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#password-hashing-happens-in-the-domain-through-a-port" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Password hashing happens in the domain, through a port
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-handler-is-an-application-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The handler is an application service
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#command-idempotency-is-derived-not-caller-supplied" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Command idempotency is derived, not caller-supplied
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-read-side-is-fed-by-a-transport-not-the-event-store" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The read side is fed by a transport, not the event store
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projections-are-materialized-and-durable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Projections are materialized and durable
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checkpoints-are-the-aggregates-implementation-detail" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checkpoints are the aggregate's implementation detail
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#observability-stays-out-of-the-domain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observability stays out of the domain
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#all-datastores-are-in-memory-for-now" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        All datastores are in-memory for now
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-memory-adapters-round-trip-like-their-durable-twins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In-memory adapters round-trip like their durable twins
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#property-based-testing-as-research" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Property-based testing, as research
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#drivers-select-their-adapters-from-a-shared-env" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Drivers select their adapters from a shared .env
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_2" id="__nav_2_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Topics
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Topics
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../event-store-ordering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event store ordering
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../LICENSE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    License
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#domain-first-adapters-after" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Domain first, adapters after
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-domains-bar-binds-the-gem-not-the-app-area" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The domain's bar binds the gem, not the app area
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cqrs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CQRS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#event-versioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Event versioning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#concurrency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concurrency
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#explicit-requires-no-autoloading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explicit requires, no autoloading
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#require_relative-for-files-we-own" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        require_relative for files we own
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#static-typing-with-sorbet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Static typing with Sorbet
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#types-over-primitives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Types over primitives
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#errors-are-part-of-the-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Errors are part of the contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#objects-validate-themselves-at-construction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Objects validate themselves at construction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#encryption-at-the-event-store-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Encryption at the event-store boundary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#password-hashing-happens-in-the-domain-through-a-port" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Password hashing happens in the domain, through a port
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-handler-is-an-application-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The handler is an application service
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#command-idempotency-is-derived-not-caller-supplied" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Command idempotency is derived, not caller-supplied
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-read-side-is-fed-by-a-transport-not-the-event-store" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The read side is fed by a transport, not the event store
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projections-are-materialized-and-durable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Projections are materialized and durable
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checkpoints-are-the-aggregates-implementation-detail" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checkpoints are the aggregate's implementation detail
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#observability-stays-out-of-the-domain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observability stays out of the domain
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#all-datastores-are-in-memory-for-now" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        All datastores are in-memory for now
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-memory-adapters-round-trip-like-their-durable-twins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In-memory adapters round-trip like their durable twins
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#property-based-testing-as-research" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Property-based testing, as research
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#drivers-select-their-adapters-from-a-shared-env" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Drivers select their adapters from a shared .env
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="design-decisions">Design decisions<a class="headerlink" href="#design-decisions" title="Permanent link">&para;</a></h1>
+<p>Choices about how the domain above is built and stored. Each is recorded with
+the reasoning behind it, because the reasoning is what has to be revisited if
+the decision ever stops holding.</p>
+<h2 id="domain-first-adapters-after">Domain first, adapters after<a class="headerlink" href="#domain-first-adapters-after" title="Permanent link">&para;</a></h2>
+<p>Work starts with the domain code, for the same reason the domain is described
+before this section. It is the part the project is actually about, and starting
+there lets the technology around it wait until the domain has enough shape to
+say what it needs.</p>
+<p>For each collaborator the domain relies on, the intention is to end up with at
+least two implementations: a memory-backed or otherwise very simple one,
+suitable for local work and end-to-end testing, and at least one built on a
+major, well known technology, ideally two. Having more than one is the point
+rather than a side effect. A collaborator with a single implementation behind
+it proves nothing, because nothing has been shown to be interchangeable. One
+with several, swapped freely without the domain noticing, is hexagonal
+architecture doing the job it was chosen for.</p>
+<p>The same applies to whatever calls the domain. There should be something local,
+and something network callable. If the domain is genuinely independent of what
+drives it, driving it two different ways should require no change to it at all.</p>
+<p>There will also be a data generator, a caller that wraps the domain and
+produces plausible events in volume. It serves as a way to stress test the
+system, and as a source of realistic data to build projections against before
+any real traffic exists.</p>
+<h2 id="the-domains-bar-binds-the-gem-not-the-app-area">The domain's bar binds the gem, not the app area<a class="headerlink" href="#the-domains-bar-binds-the-gem-not-the-app-area" title="Permanent link">&para;</a></h2>
+<p>The practices the project holds itself to — full coverage killed by mutation
+testing, <code>typed: strict</code> signatures, explicit <code>require_relative</code> for every
+dependency, a named type in place of a bare primitive, errors named in the
+contract — are constraints on the domain gem in <code>lib/</code>. That gem is the thing
+the project is a demonstration of, and it is held to them without exception.</p>
+<p>The app area in <code>app/</code> is not that thing. Its adapters exist to prove the ports
+against real technology — the <a href="#domain-first-adapters-after">domain first, adapters
+after</a> rule — and its drivers exist to run the
+domain end to end and to generate data to build projections against. That is
+integration and demonstration code. Holding it to the domain's bar would spend
+effort proving nothing about the part being demonstrated, so it is exempt by
+design: an adapter or driver may <code>require</code> the gem by name rather than reaching
+for each class with <code>require_relative</code>, need not carry <code>typed: strict</code>, and is
+not measured for mutation coverage. It still has to work — its specs run and
+pass, and it is where the ports are shown to be interchangeable — but "works,
+and proves the port" is a deliberately lower bar than "is the correct core".</p>
+<p>This is why, for instance, the drivers and adapters <code>require 'stweak'</code> rather
+than the domain's own <code>require_relative</code>, and why the read-only web admin is
+<code>typed: false</code>: each is the app area behaving as the app area, not a lapse in
+the domain's discipline. The line is the <code>lib/</code> boundary, and it is drawn on
+purpose.</p>
+<h2 id="cqrs"><abbr title="keeping the path that changes things separate from the reads">CQRS</abbr><a class="headerlink" href="#cqrs" title="Permanent link">&para;</a></h2>
+<p><abbr title="keeping the path that changes things separate from the reads">CQRS</abbr> (command query responsibility segregation) keeps the path that changes
+things separate from the path that reads them. This project is built around
+that split rather than adopting it as an extra layer, because the design above
+already points at it: an event log is a poor thing to query directly, so writes
+and reads were never going to be the same shape. <abbr title="keeping the path that changes things separate from the reads">CQRS</abbr> makes that difference
+explicit and deliberate.</p>
+<p>The write path is commands. A command is an intention, such as "create this
+Account" or "ban this Player", handled against an aggregate that checks it
+against current state and emits events. This path is shaped by the rules, and
+is deliberately not shaped for answering questions: an aggregate is rebuilt
+from its own stream so that it can enforce consistency, and reaching into one
+for a read would be fighting that design.</p>
+<p>The read path is projections. Every question the system answers, such as what
+an account looks like now or how many games a player won last season, is
+answered by a read model built from the event log, never by poking at aggregate
+state. Read models are shaped by the questions people want to ask, which is why
+they can be rebuilt and replaced as those questions change.</p>
+<p>In practice the domain defines commands, events and aggregates and says nothing
+about how any of them are delivered; the read models, and the projectors that
+maintain them, are application-layer. The two sides are developed and tested
+separately, and joined only by the event log between them: nothing on the read
+side knows how a write happens, and nothing on the write side knows how its
+events will eventually be read.</p>
+<h2 id="event-versioning">Event versioning<a class="headerlink" href="#event-versioning" title="Permanent link">&para;</a></h2>
+<p>Events carry a version number, and old versions are upcast on read. When an
+event's shape changes, what is already in the log stays exactly as it was
+written; the new version is given a new number, and reading an older one
+translates it into the current shape before anything else sees it.</p>
+<p>The alternative, rewriting history to match the code, would break the one
+guarantee the log is there to provide. This way the log stays append-only and
+the rest of the system only ever deals with events in their current form.</p>
+<p>The machinery is a single seam. The domain declares how to translate an older
+form: <code>Event.upcast(hash)</code> takes a serialized event and returns it in the
+current shape, defaulting to identity for an event whose shape has never
+changed, and overridden by an event whose schema changes to recognise an older
+form by its <code>version</code> and migrate it. The read path honours that declaration —
+the same "domain declares, adapter honours" boundary as encryption — applying
+<code>upcast</code> before <code>from_h</code>, so <code>from_h</code> only ever sees the current shape and this
+is where an event's <code>version</code> is consumed. Every store that rebuilds an event
+from its stored form runs it: the durable store at its serialization boundary,
+and the in-memory store, which round-trips through the serialized form on read
+rather than holding live objects, so its behaviour matches the durable twin
+instead of quietly skipping versioning. No real event has a second version yet,
+so <code>upcast</code> is identity throughout; the seam exists so the first genuine schema
+change has somewhere to live, and it is proven by a test-only event that
+carries one.</p>
+<h2 id="concurrency">Concurrency<a class="headerlink" href="#concurrency" title="Permanent link">&para;</a></h2>
+<p>Writes use optimistic concurrency on the stream. A command is handled against
+an aggregate rebuilt to a known position in its stream, and the resulting
+events are only accepted if the stream is still at that position. If something
+else has appended in the meantime, the write is rejected rather than applied on
+top of state that has since moved.</p>
+<p>Nothing is locked, which is the appeal: the common case, where two commands
+touch different aggregates, costs nothing at all, and the rare case of genuine
+contention is caught at the point it would do damage.</p>
+<h2 id="explicit-requires-no-autoloading">Explicit requires, no autoloading<a class="headerlink" href="#explicit-requires-no-autoloading" title="Permanent link">&para;</a></h2>
+<p>Every gem dependency is declared <code>require: false</code>, and every file requires
+exactly what it uses, where it uses it. Nothing is autoloaded, and no framework
+populates the namespace at boot.</p>
+<p>This is a departure from normal Ruby and Rails convention, and it comes from
+experience debugging applications rather than from theory. When loading is
+implicit, "where is this class actually coming from?" is a question the source
+cannot answer, and it tends to be asked at the worst possible moment. Explicit
+requires make the dependency graph readable from the files themselves: what a
+file needs is written at the top of it, and what the project needs is the union
+of those lines rather than a convention held in someone's head.</p>
+<p>The cost is real and worth stating. There is more ceremony, requires have to be
+maintained by hand, and a missing one fails at load rather than being papered
+over. That is the trade being made deliberately: a slightly noisier source in
+exchange for a system whose loading can be reasoned about.</p>
+<p>It also sits well with the rest of the design. A domain that knows nothing
+about the technology around it should not be quietly handed that technology by
+a framework it never asked about.</p>
+<h2 id="require_relative-for-files-we-own">require_relative for files we own<a class="headerlink" href="#require_relative-for-files-we-own" title="Permanent link">&para;</a></h2>
+<p>Files the project owns are loaded with <code>require_relative</code>; <code>require</code> is
+reserved for gems and the standard library. A project file is reached by the
+relative path written at the top of the file that uses it, never by a name
+resolved through the load path.</p>
+<p>The reason is that <code>$LOAD_PATH</code> is a shared, global resource. Every directory
+added to it so that <code>require 'stweak/...'</code> resolves stays there for the whole
+process, and the more of the project that is loadable by bare name, the closer
+it comes to the implicit, unreadable loading this project already rejects.
+Keeping our own files off the load path means the only way to reach one is the
+explicit relative path in the file that uses it.</p>
+<p>The cost is that moving a file to a new directory means fixing the relative
+paths that point at it, a small, mechanical price for keeping the load path to
+what it is actually for: the gems and the standard library.</p>
+<h2 id="static-typing-with-sorbet"><abbr title="checking data shape before the program runs">Static typing</abbr> with Sorbet<a class="headerlink" href="#static-typing-with-sorbet" title="Permanent link">&para;</a></h2>
+<p>The domain carries Sorbet signatures, checked by <code>srb tc</code> before the tests run.</p>
+<p>A domain built from value objects, commands and events is largely a set of
+claims about shape: this identifier is a UUID, this event carries exactly these
+fields, this method returns a Player or raises. Those claims can be written
+down and checked rather than left implicit and tested for one case at a time.
+<abbr title="checking data shape before the program runs">Static typing</abbr> also complements mutation testing: the type checker eliminates a
+whole category of mutation that would otherwise need a test to kill, leaving
+the test suite to concentrate on behaviour rather than on shape.</p>
+<p>The cost is sigils and signatures in the source, which some readers find
+noisy, and gem RBIs that have to be regenerated as dependencies change. Both
+seem a fair price for a project whose stated goal is being checkable.</p>
+<h2 id="types-over-primitives">Types over primitives<a class="headerlink" href="#types-over-primitives" title="Permanent link">&para;</a></h2>
+<p>The domain prefers a named type to a bare primitive wherever the value means
+more than its class. An account id is an <code>AccountId</code>, not a <code>String</code>; a season
+is a <code>Season</code>, not a number. The type system then carries meaning: a method
+that accepts an <code>AccountId</code> cannot be handed a username, and a signature says
+what a value is for without a reader having to guess.</p>
+<p>This is static typing taken one step further. A signature pins down shape;
+choosing the right type pins down meaning, and lets the checker catch the
+confusion a bare string would hide. The cost is more types and more ceremony,
+which is the same trade the project already makes for static typing, and it is
+accepted for the same reason: the check happens before the code runs.</p>
+<h2 id="errors-are-part-of-the-contract">Errors are part of the contract<a class="headerlink" href="#errors-are-part-of-the-contract" title="Permanent link">&para;</a></h2>
+<p>An API's errors are part of its contract, named and documented like its return
+values. A method that can fail says what it raises, and a caller can depend on
+that list rather than discovering failures by reading the body. Errors are
+reserved for situations that are genuinely errors — something that should not
+have happened, given the rules — not for steering control flow.</p>
+<p>This is the sibling of static typing. A signature describes what a method takes
+and returns, but a contract is incomplete without what can go wrong. Naming an
+error for what it means, an account that already exists or a key that is not
+there, is the same explicitness the project applies everywhere else: the
+behaviour of a method is declared, not discovered.</p>
+<h2 id="objects-validate-themselves-at-construction">Objects validate themselves at construction<a class="headerlink" href="#objects-validate-themselves-at-construction" title="Permanent link">&para;</a></h2>
+<p>The domain's value objects, commands and events validate themselves when they
+are built. An object that cannot be made valid does not come into existence:
+its constructor raises rather than returning a potentially invalid instance
+that might later be handed to a service.</p>
+<p>The reason is blunt. If a command can be constructed in a state its handler
+then has to check for, that invalid state will eventually be constructed and
+passed around, and the failure will surface far from where the mistake was
+made. Making construction the only way to create an object, and refusing
+invalid input at that point, means an invalid object is not merely unlikely.
+It is unrepresentable.</p>
+<p>This is the same kind of claim the project makes elsewhere, moved earlier in
+time. Sorbet signatures pin down the shape of an object before the program
+runs, and constructor validation pins down whether that shape is a legal one at
+the moment it is filled in. Between the two, by the time a handler receives a
+command, both its type and the validity of its contents are already settled.</p>
+<p>None of this replaces the checks that decide whether a command is allowed.
+Whether a command is well-formed is one question, and whether it is allowed is
+another, and how the second is answered depends on the rule. One that lives
+within a single aggregate — such as an account having already been created —
+is checked by the aggregate itself. One that spans aggregates, such as a
+username being unique across all accounts, cannot be: no single aggregate can
+see the others, so it is checked at handling time against the read model of
+usernames. This decision guarantees that the first question never goes
+unanswered, because a broken object cannot be built.</p>
+<h2 id="encryption-at-the-event-store-boundary">Encryption at the event-store boundary<a class="headerlink" href="#encryption-at-the-event-store-boundary" title="Permanent link">&para;</a></h2>
+<p>The event class declares which fields are personal data — for example,
+<code>AccountCreated.pii_fields</code> returns <code>[:name]</code>. That declaration is a business
+rule, a statement of what the law requires to be erasable, so it lives in the
+domain. The cryptography that honours it lives in an adapter: an
+<code>EncryptingEventStore</code> decorates a raw event store, encrypting every PII field
+on append and decrypting it back on read. The domain emits and receives the
+plaintext name and never knows what AES-256-GCM is.</p>
+<p>The cipher is AES-256-GCM with a random 256-bit key and a fresh nonce per
+encryption; the nonce and authentication tag are stored alongside the
+ciphertext, so each encrypted value is self-contained. Keys are created
+implicitly on first use, held per entity that owns personal data, and stored in
+a key store outside the event log — the crypto-shredding design from the
+<a href="../#gdpr">GDPR</a> section. An entity is an aggregate class and an id: keys are
+qualified with the owner's class, so an Account and a Player that happen to
+share an id never share a key.</p>
+<h2 id="password-hashing-happens-in-the-domain-through-a-port">Password hashing happens in the domain, through a port<a class="headerlink" href="#password-hashing-happens-in-the-domain-through-a-port" title="Permanent link">&para;</a></h2>
+<p><code>CreateAccount</code> carries the raw password, and the handler hashes it through a
+<code>PasswordHasher</code> port before the aggregate ever sees it. The raw password never
+reaches the event log, and a caller — a future CLI or HTTP adapter — never
+touches hashing at all.</p>
+<p>The implementation is PBKDF2-HMAC-SHA256 with a per-password random salt, using
+only the stdlib. The stored value is self-describing
+(<code>pbkdf2-sha256$&lt;iterations&gt;$&lt;salt&gt;$&lt;hash&gt;</code>), so verification can be added
+later without changing what is stored. The method is named <code>digest</code> rather than
+<code>hash</code> because <code>hash</code> collides with <code>Kernel#hash</code>, which would make an
+implementor unusable as a hash key.</p>
+<h2 id="the-handler-is-an-application-service">The handler is an application service<a class="headerlink" href="#the-handler-is-an-application-service" title="Permanent link">&para;</a></h2>
+<p><code>CreateAccountHandler</code> lives in the domain layer, not in a driving adapter. It
+hashes the command's password, drives the aggregate, and appends to the event
+store; the command validated itself when it was built. It is deliberately
+built to be driven two different ways — something local, something network
+callable — without any change to the domain, per the <a href="#domain-first-adapters-after">domain first, adapters
+after</a> decision.</p>
+<h2 id="command-idempotency-is-derived-not-caller-supplied"><abbr title="a request for something to happen, which may be rejected">Command</abbr> idempotency is derived, not caller-supplied<a class="headerlink" href="#command-idempotency-is-derived-not-caller-supplied" title="Permanent link">&para;</a></h2>
+<p>A retried command should produce its original result, not a fresh error: if a
+client's request times out and is sent again, the second create of the same
+account should return the account, not raise. There is no caller-supplied
+idempotency key — the callers of this domain are not trusted to manage one —
+so the key is derived from the command itself. For <code>CreateAccount</code> it is the
+username: the account id names the aggregate, and the username is what a retry
+carries unchanged. The account stores the username of the command that created
+it, so a retry is recognized by replaying the account and comparing usernames:
+a match returns the account, and a mismatch is a genuine second create and
+raises.</p>
+<p>The limitation is the deliberate price of deriving the key from parameters: a
+retry is recognized by the username alone, so one that changed its password or
+display name is still treated as the same command. Hashing makes a password
+incomparable, and the username is the part of the command that names the thing
+being created; this is an idempotency key, not a guarantee of command equality.</p>
+<h2 id="the-read-side-is-fed-by-a-transport-not-the-event-store">The read side is fed by a transport, not the event store<a class="headerlink" href="#the-read-side-is-fed-by-a-transport-not-the-event-store" title="Permanent link">&para;</a></h2>
+<p>The event store emits appended events to a <em>subscription</em> — a port that
+delivers them to whoever has registered as a listener. The store's append
+publishes and knows nothing about the listeners; a listener registers and
+knows nothing about the emitter; the two meet only at the port. In memory the
+delivery is a synchronous callback in the publishing process, so a listener
+hears every append as it happens. In production the same port would be
+implemented over a queue such as SQS: the publish side sends the events to the
+queue, a consumer reads from it, and delivery is out of process. The domain
+depends on the port and nothing else, so the in-memory and queue
+implementations are interchangeable without touching it. Delivery is
+at-least-once — a listener may receive a batch more than once — and tolerating
+that is the listener's job. The projection system is the natural listener.</p>
+<h2 id="projections-are-materialized-and-durable">Projections are materialized and durable<a class="headerlink" href="#projections-are-materialized-and-durable" title="Permanent link">&para;</a></h2>
+<p>The read models are projections: derived data materialized in the projection
+store — a relational database, SQLite in the app area with an in-memory twin
+in the domain gem — so they can be queried and so they survive a restart. A
+projection is a <em>projector</em>: an application-layer handler that turns the events
+it cares about into create/update/delete operations on the read-model table it
+maintains, and ignores the rest, so replaying it over the full log always
+produces the same table. The database therefore looks like a normal application
+database — an accounts table, keyed by account — with one extra table of
+machinery: <code>projection_cursors</code> holds one indexed row per (projection, stream)
+recording the highest sequence consumed, so a restarted projector resumes from
+each stream's cursor instead of replaying every stream. The event log remains
+the source of truth — a projection is derived and disposable in the sense that
+it can be discarded and rebuilt from the streams at any time, not in the sense
+that it is transient. The projection system keeps each projector current: it
+registers on the subscription, feeds it the events it has not yet consumed, and
+persists its cursors after every batch. Re-delivered events are skipped by the
+per-stream cursor, so the system is safe under the subscription's at-least-once
+delivery.</p>
+<p>Personal data in a read model is encrypted at the store boundary, the same
+crypto-shredding boundary as the event store: the accounts table stores the
+account's display name and email encrypted under a per-account key, and
+deleting the key renders them unreadable. Usernames and password hashes are
+deliberately not encrypted — the username must survive shredding so the
+uniqueness check keeps working, and a password hash is already unreadable.</p>
+<h2 id="checkpoints-are-the-aggregates-implementation-detail">Checkpoints are the aggregate's implementation detail<a class="headerlink" href="#checkpoints-are-the-aggregates-implementation-detail" title="Permanent link">&para;</a></h2>
+<p>Every 100 events on an aggregate's stream, the aggregate's state is saved to
+the checkpoint store as a checkpoint, so a command handler can resume an
+aggregate from its latest checkpoint plus only the events after it, instead of
+replaying the whole stream. The checkpointing logic is the aggregate's: replay
+restores from a checkpoint and applies only the tail, the aggregate decides
+when one is due, and it serializes its own state. The handler's part is
+mechanical — it passes a stored checkpoint into replay and persists whatever
+checkpoint the aggregate reports after a successful append — so nothing
+outside the aggregate can tell whether a replay used a checkpoint or not. A
+checkpoint is derived data: the event log remains the source of truth, and any
+checkpoint can be discarded and rebuilt.</p>
+<p>Two things follow from this. A checkpoint carries the aggregate's serialized
+state, including personal data such as an account's display name and email, so
+a durable checkpoint store encrypts it — the same crypto-shredding boundary as
+the event store. An <code>EncryptingCheckpointStore</code> decorates the durable store,
+encrypting each state key the aggregate declares as personal data before the
+checkpoint is persisted and decrypting it back on read; which keys those are is
+the aggregate's own declaration (<code>checkpoint_pii_fields</code>), because the state is
+the aggregate's serialization of itself and naming its personal data is a
+domain business rule, the same as <code>Event.pii_fields</code>. The in-memory checkpoint
+store holds plaintext, accepted while everything is in memory. And the handler
+reads only the tail: when a checkpoint is present it reads the events after the
+checkpoint's version through the event store's range read (<code>read_stream</code>'s
+<code>after:</code> bound) rather than reading the whole stream and letting replay skip
+the prefix, so a checkpoint saves the read as well as the replay. The whole
+stream is just the <code>after: 0</code> case of the same read, so nothing outside the
+handler has to know which path was taken.</p>
+<h2 id="observability-stays-out-of-the-domain">Observability stays out of the domain<a class="headerlink" href="#observability-stays-out-of-the-domain" title="Permanent link">&para;</a></h2>
+<p>The domain does not log, and it does not emit metrics. Observability is a
+concern of the technology around the domain, not of the rules themselves, and
+putting it in the domain would leak an infrastructure concern into the very
+part of the system that is meant to stay pure. When telemetry is genuinely
+needed, it is added from outside: a module prepended onto the domain class, or
+a wrapper around it, that logs and times and counts while the wrapped class
+stays exactly as it was.</p>
+<p>This is the same boundary as encryption. There, the domain declares which
+fields are personal data and an adapter honours it; here, the domain does its
+work and a decorator records it. The domain is left plain, and the
+instrumentation can be swapped in and out without the domain knowing.</p>
+<h2 id="all-datastores-are-in-memory-for-now">All datastores are in-memory for now<a class="headerlink" href="#all-datastores-are-in-memory-for-now" title="Permanent link">&para;</a></h2>
+<p>In the domain gem, the event store, the key store behind it, the checkpoint
+store, and the projection store each have an in-memory adapter, so nothing
+survives a restart by default. The app area holds the durable twins — the
+DynamoDB event store, the Redis key and checkpoint stores, and the SQLite
+projection store — so each collaborator meets the two-implementations rule
+above. The SQLite projection store is a fully relational read-model database
+rather than a keyed blob: read models are rows in their own tables, with
+per-stream cursors in a shared <code>projection_cursors</code> table.</p>
+<h2 id="in-memory-adapters-round-trip-like-their-durable-twins">In-memory adapters round-trip like their durable twins<a class="headerlink" href="#in-memory-adapters-round-trip-like-their-durable-twins" title="Permanent link">&para;</a></h2>
+<p>An in-memory adapter is not a shortcut that holds live objects; it is a faithful
+twin of the durable one, and it earns that by round-tripping every value through
+its serialized form on the way in and out. The in-memory event store keeps each
+event's serialized hash rather than the event, and rebuilds it on read; the
+checkpoint store keeps a detached copy of the checkpoint's state and version and
+rebuilds the <code>Checkpoint</code>; the key store copies the key in and out; the
+projection store copies each row and cursor set in and out; and the event
+subscription reconstructs each event before delivering it. The consequences are
+the ones the durable stores have for real: only plain, serializable data
+survives, a caller never sees or can mutate the store's own object, and any
+read-path translation runs here too — an older-version event is upcast on a
+store read and on a subscription delivery exactly as it is on the durable
+<a href="#event-versioning">event versioning</a> path.</p>
+<p>The line the twins draw is where the wire codec lives. The serialized form the
+in-memory adapter round-trips through is the <em>domain's</em> form — an event's
+<code>to_h</code>/<code>from_h</code>, a checkpoint's state and version — never JSON or SQL. Those wire
+codecs belong to the durable twin: the DynamoDB store and the SQS transport add
+JSON, the SQLite store adds columns, on top of the same domain form. So the
+domain gem stays free of any wire format, and the in-memory adapter proves the
+behaviour without importing the technology. The one exception is the key store,
+whose value is a raw binary key rather than structured data: there is no
+serialized form to round-trip through, so the copy is a plain <code>dup</code> rather than
+a codec.</p>
+<p>Neither in-memory adapter needs a type-name registry the way the durable
+transport does. A durable consumer reads bytes off a queue and must resolve a
+class from a type string; an in-memory adapter already holds the live object, so
+it captures the object's own class — the current class for its type, the one
+that knows how to read older versions — and reconstructs through that. The
+asymmetry is deliberate: the two resolve the class differently and both apply
+the same read-path translation.</p>
+<h2 id="property-based-testing-as-research"><abbr title="stating a property, searching for a counterexample">Property-based testing</abbr>, as research<a class="headerlink" href="#property-based-testing-as-research" title="Permanent link">&para;</a></h2>
+<p><abbr title="stating a property, searching for a counterexample">Property-based testing</abbr> states what should be true of all inputs and lets the
+tooling search for a counterexample, rather than asserting one example at a
+time. In principle it pairs well with what is already here: mutation testing
+asks whether the tests pin behaviour down, and property tests generate the
+cases nobody thought to write.</p>
+<p>In practice the author has no experience with it at all. It is being tried
+because it looks like a good fit, not because it is known to be one, and it may
+turn out to be a poor match for this domain or simply more trouble than it is
+worth.</p>
+<h2 id="drivers-select-their-adapters-from-a-shared-env">Drivers select their adapters from a shared .env<a class="headerlink" href="#drivers-select-their-adapters-from-a-shared-env" title="Permanent link">&para;</a></h2>
+<p>A driver picks its adapters at boot from environment variables rather than
+hard-wiring them. Each collaborator has its own selector: <code>EVENT_STORE</code>,
+<code>PROJECTION_STORE</code>, <code>KEY_STORE</code>, <code>SUBSCRIPTION</code> and <code>CHECKPOINT_STORE</code> each name
+<code>memory</code> or the real technology, defaulting to the real one. Swapping an adapter
+is then an edit to a <code>.env</code>, not a change to code, so the same driver runs
+entirely in memory for a demonstration or against the real stores to read what
+the generator produced. A read-only driver reads only the selectors it needs and
+ignores the rest: <code>web_admin</code> honours the three store selectors and never looks
+at the write-side two.</p>
+<p>The <code>.env</code> is a single file shared by every driver, held in the drivers folder
+rather than one per driver. This is the point of the decision, not a convenience:
+the data generator and <code>web_admin</code> read the same selectors from the same file, so
+one edit sets the adapters for the whole system and it can be exercised end to
+end — generate against a set of stores, then read them back through the web view
+— under whatever adapters that file names.</p>
+<p>This is what makes the drivers a live demonstration of hexagonal architecture
+rather than a description of one: the domain's ports are driven from outside, and
+the technology behind them is chosen without the driver's own code knowing which
+it got. It is the <a href="#domain-first-adapters-after">domain first, adapters after</a>
+rule turned into something a reader can toggle.</p>
+<p>Two things follow, both deliberate. The drivers load the <code>.env</code> through <code>dotenv</code>
+— the only bundles in the project to do so, a departure justified by a driver
+being where adapter choice is a runtime input rather than a wiring decision.
+<code>dotenv</code> only populates <code>ENV</code>, and it does not overwrite a variable already set,
+so the vars are still read with the same <code>ENV.fetch</code> used everywhere else and the
+dev container's service endpoints win over the file's localhost defaults. And
+coherence across the selectors is the operator's responsibility, not the
+driver's: the stores should be switched as a set, because a real event store
+against a memory projection reads events but shows no accounts, and a memory key
+store against real ciphertext decrypts a person's data to "erased". This is left
+unenforced on purpose — the drivers are a demonstration, and machinery to police
+a <code>.env</code> would be ceremony the point does not need.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 Jeffrey Jones
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "content.tooltips", "navigation.indexes", "navigation.tabs", "navigation.top", "search.highlight", "search.share"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
