@@ -6,6 +6,7 @@ require_relative '../../domain/aggregate'
 require_relative '../../domain/event'
 require_relative '../../domain/id'
 require_relative '../../ports/event_store'
+require_relative '../../ports/event_subscription'
 
 module Stweak
   module Adapters
@@ -13,8 +14,11 @@ module Stweak
     module EventStore
       # The simplest event store: per-stream event lists in memory, qualified
       # by the aggregate class that owns the stream so that an Account and a
-      # Player that happen to share an id never share a stream. Thread-safe and
-      # adequate for tests and local work, but nothing survives a restart.
+      # Player that happen to share an id never share a stream. When given a
+      # subscription it publishes every append to it — the in-memory
+      # equivalent of a transport such as an SQS queue carrying the events to
+      # listeners. Thread-safe and adequate for tests and local work, but
+      # nothing survives a restart.
       #
       # rubocop:disable Metrics/ClassLength -- the store implements the port
       # and the emit side of append delivery; the extra methods are the point.
@@ -31,17 +35,20 @@ module Stweak
         # only ever one class per type, so no type-name registry is needed.
         Stored = T.type_alias { [T.class_of(Stweak::Domain::Event), T::Hash[String, T.untyped]] }
 
-        sig { void }
-        def initialize
+        # @param subscription [Stweak::Ports::EventSubscription, nil] the
+        #   channel to publish appends to, or nil to keep the store silent
+        sig { params(subscription: T.nilable(Stweak::Ports::EventSubscription)).void }
+        def initialize(subscription: nil)
           @streams = T.let(
             {},
             T::Hash[T.class_of(Stweak::Domain::Aggregate), T::Hash[Stweak::Domain::Id, T::Array[Stored]]]
           )
+          @subscription = subscription
           @mutex = T.let(Mutex.new, Mutex)
         end
 
         # @param owner_type [Class<Stweak::Domain::Aggregate>]
-        # @param stream_id [String]
+        # @param stream_id [Stweak::Domain::Id]
         # @param expected_version [Integer]
         # @param events [Array<Stweak::Domain::Event>]
         # @raise [Stweak::Ports::ConcurrencyError] if the stream has moved on,
@@ -58,20 +65,14 @@ module Stweak
         end
         def append(owner_type:, stream_id:, expected_version:, events:)
           @mutex.synchronize do
-            current = version_of(owner_type, stream_id)
-            assert_version!(owner_type, stream_id, current, expected_version)
-
-            streams = streams_for_type(owner_type)
-            events.each do |event|
-              assert_sequence!(owner_type, stream_id, current, event)
-              (streams[stream_id] ||= []) << [event.class, event.to_h]
-              current = event.sequence
-            end
+            assert_version!(owner_type, stream_id, version_of(owner_type, stream_id), expected_version)
+            append_to_stream(owner_type, stream_id, events)
           end
+          @subscription&.publish(events: events)
         end
 
         # @param owner_type [Class<Stweak::Domain::Aggregate>]
-        # @param stream_id [String]
+        # @param stream_id [Stweak::Domain::Id]
         # @param after [Integer] the exclusive lower bound on sequence; 0 reads
         #   the whole stream
         # @return [Array<Stweak::Domain::Event>]
@@ -146,7 +147,7 @@ module Stweak
         # The current version of a stream: how many events it holds.
         #
         # @param owner_type [Class<Stweak::Domain::Aggregate>]
-        # @param stream_id [String]
+        # @param stream_id [Stweak::Domain::Id]
         # @return [Integer]
         sig do
           params(owner_type: T.class_of(Stweak::Domain::Aggregate), stream_id: Stweak::Domain::Id)
@@ -156,8 +157,31 @@ module Stweak
           @streams.fetch(owner_type, {}).fetch(stream_id, []).length
         end
 
+        # Append the events to their stream. Each event must be the next in
+        # its stream's sequence; the stream's length is that sequence's
+        # version, since the append version was already checked against it.
+        #
         # @param owner_type [Class<Stweak::Domain::Aggregate>]
-        # @param stream_id [String]
+        # @param stream_id [Stweak::Domain::Id]
+        # @param events [Array<Stweak::Domain::Event>]
+        sig do
+          params(
+            owner_type: T.class_of(Stweak::Domain::Aggregate),
+            stream_id: Stweak::Domain::Id,
+            events: T::Array[Stweak::Domain::Event]
+          ).void
+        end
+        def append_to_stream(owner_type, stream_id, events)
+          streams = streams_for_type(owner_type)
+          events.each do |event|
+            stream = streams[stream_id] ||= []
+            assert_sequence!(owner_type, stream_id, stream.length, event)
+            stream << [event.class, event.to_h]
+          end
+        end
+
+        # @param owner_type [Class<Stweak::Domain::Aggregate>]
+        # @param stream_id [Stweak::Domain::Id]
         # @param current [Integer]
         # @param expected [Integer]
         # @raise [Stweak::Ports::ConcurrencyError] if current and expected differ
@@ -177,7 +201,7 @@ module Stweak
         end
 
         # @param owner_type [Class<Stweak::Domain::Aggregate>]
-        # @param stream_id [String]
+        # @param stream_id [Stweak::Domain::Id]
         # @param current [Integer]
         # @param event [Stweak::Domain::Event]
         # @raise [Stweak::Ports::ConcurrencyError] if the event is not next

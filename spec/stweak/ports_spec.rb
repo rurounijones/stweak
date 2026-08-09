@@ -2,10 +2,10 @@
 # frozen_string_literal: true
 
 require_relative '../../lib/stweak/domain/aggregate'
-require_relative '../../lib/stweak/domain/checkpoint'
 require_relative '../../lib/stweak/domain/id'
-require_relative '../../lib/stweak/ports/checkpoint_store'
 require_relative '../../lib/stweak/ports/event_store'
+require_relative '../../lib/stweak/ports/event_store_listener'
+require_relative '../../lib/stweak/ports/event_subscription'
 require_relative '../../lib/stweak/ports/key_store'
 
 # A valid id the examples pass through the ports.
@@ -61,50 +61,42 @@ class RecordingEventStore
   # rubocop:enable Naming/BlockForwarding
 end
 
-class HashCheckpointStore
-  include Stweak::Ports::CheckpointStore
+# A minimal listener, for exercising the listener port and the subscription.
+class RecordingListener
+  include Stweak::Ports::EventStoreListener
+
+  extend T::Sig
+
+  attr_reader :deliveries
+
+  sig { void }
+  def initialize
+    @deliveries = T.let([], T::Array[T::Array[Stweak::Domain::Event]])
+  end
+
+  sig { override.params(events: T::Array[Stweak::Domain::Event]).void }
+  def on_events_appended(events:)
+    @deliveries << events
+  end
+end
+
+class HashSubscription
+  include Stweak::Ports::EventSubscription
 
   extend T::Sig
 
   def initialize
-    @checkpoints = {}
+    @listeners = []
   end
 
-  sig do
-    override
-      .params(
-        owner_type: T.class_of(Stweak::Domain::Aggregate),
-        owner_id: Stweak::Domain::Id
-      )
-      .returns(T.nilable(Stweak::Domain::Checkpoint))
-  end
-  def get(owner_type:, owner_id:)
-    @checkpoints[[owner_type, owner_id]]
+  sig { override.params(listener: Stweak::Ports::EventStoreListener).void }
+  def register(listener:)
+    @listeners << listener
   end
 
-  sig do
-    override
-      .params(
-        owner_type: T.class_of(Stweak::Domain::Aggregate),
-        owner_id: Stweak::Domain::Id,
-        checkpoint: Stweak::Domain::Checkpoint
-      )
-      .void
-  end
-  def put(owner_type:, owner_id:, checkpoint:)
-    @checkpoints[[owner_type, owner_id]] = checkpoint
-  end
-
-  sig do
-    override
-      .params(
-        owner_type: T.class_of(Stweak::Domain::Aggregate),
-        owner_id: Stweak::Domain::Id
-      )
-      .void
-  end
-  def delete(owner_type:, owner_id:)
-    @checkpoints.delete([owner_type, owner_id])
+  sig { override.params(events: T::Array[Stweak::Domain::Event]).void }
+  def publish(events:)
+    @listeners.each { |listener| listener.on_events_appended(events: events) }
   end
 end
 
@@ -198,20 +190,21 @@ RSpec.describe Stweak::Ports do
     end
   end
 
-  describe Stweak::Ports::CheckpointStore do
-    it 'accepts an implementor that stores and returns a checkpoint' do
-      store = HashCheckpointStore.new
-      checkpoint = Stweak::Domain::Checkpoint.new(state: { 'username' => 'alice' }, version: 100)
-      store.put(owner_type: Stweak::Domain::Aggregate, owner_id: TEST_ID, checkpoint: checkpoint)
-      expect(store.get(owner_type: Stweak::Domain::Aggregate, owner_id: TEST_ID)).to eq(checkpoint)
+  describe Stweak::Ports::EventSubscription do
+    it 'accepts an implementor that registers a listener' do
+      subscription = HashSubscription.new
+      listener = RecordingListener.new
+      subscription.register(listener: listener)
+      subscription.publish(events: [])
+      expect(listener.deliveries).to eq([[]])
     end
 
-    it 'accepts an implementor that deletes a checkpoint' do
-      store = HashCheckpointStore.new
-      checkpoint = Stweak::Domain::Checkpoint.new(state: { 'username' => 'alice' }, version: 100)
-      store.put(owner_type: Stweak::Domain::Aggregate, owner_id: TEST_ID, checkpoint: checkpoint)
-      store.delete(owner_type: Stweak::Domain::Aggregate, owner_id: TEST_ID)
-      expect(store.get(owner_type: Stweak::Domain::Aggregate, owner_id: TEST_ID)).to be_nil
+    it 'accepts an implementor that delivers to every listener' do
+      subscription = HashSubscription.new
+      listeners = Array.new(2) { RecordingListener.new }
+      listeners.each { |listener| subscription.register(listener: listener) }
+      subscription.publish(events: [])
+      expect(listeners.map(&:deliveries)).to all(eq([[]]))
     end
   end
 end

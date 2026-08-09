@@ -427,6 +427,22 @@ built to be driven two different ways — something local, something network
 callable — without any change to the domain, per the [domain first, adapters
 after](#domain-first-adapters-after) decision.
 
+### The read side is fed by a transport, not the event store
+
+The event store emits appended events to a *subscription* — a port that
+delivers them to whoever has registered as a listener. The store's append
+publishes and knows nothing about the listeners; a listener registers and
+knows nothing about the emitter; the two meet only at the port. In memory the
+delivery is a synchronous callback in the publishing process, so a listener
+hears every append as it happens. In production the same port would be
+implemented over a queue such as SQS: the publish side sends the events to the
+queue, a consumer reads from it, and delivery is out of process. The domain
+depends on the port and nothing else, so the in-memory and queue
+implementations are interchangeable without touching it. Delivery is
+at-least-once — a listener may receive a batch more than once — and tolerating
+that is the listener's job. The projection system, when the read side exists,
+is the natural listener.
+
 ### Checkpoints are the aggregate's implementation detail
 
 Every 100 events on an aggregate's stream, the aggregate's state is saved to
