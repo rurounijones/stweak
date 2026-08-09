@@ -1,0 +1,15 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative '../lib/wiring'
+
+# Generate plausible account-creation events in volume against the real
+# adapters. Usage: stweak-generate [count]
+count = Integer(ARGV.fetch(0, '100'))
+generator = DataGenerator::Wiring.build(
+  database_path: ENV.fetch('STWEAK_DB', 'stweak.db'),
+  streams_table: ENV.fetch('STWEAK_STREAMS_TABLE', 'stweak_streams'),
+  queue_name: ENV.fetch('STWEAK_QUEUE', 'stweak-events')
+)
+accounts = generator.run(count)
+puts "Created #{accounts.length} accounts"
