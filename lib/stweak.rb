@@ -26,6 +26,7 @@ require_relative 'stweak/ports/event_store_listener'
 require_relative 'stweak/ports/event_subscription'
 require_relative 'stweak/ports/key_store'
 require_relative 'stweak/ports/projection_store'
+require_relative 'stweak/ports/usernames'
 
 # Player account management for a theoretical online team PvP game.
 #

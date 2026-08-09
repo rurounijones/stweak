@@ -17,6 +17,13 @@ module Stweak
       # clashes with the account already existing.
       class AccountAlreadyExists < ConflictError; end
 
+      # Raised when an account is created with a username another account
+      # already uses. A conflict, in the domain taxonomy: the change clashes
+      # with an existing username. The rule spans aggregates — no single
+      # account can know the others' usernames — so it is checked at handling
+      # time against the read model of usernames, not by the aggregate.
+      class UsernameTaken < ConflictError; end
+
       # The Account aggregate. Guards the rules around creating an account, and
       # derives its state by replaying its own stream rather than from a stored
       # record.

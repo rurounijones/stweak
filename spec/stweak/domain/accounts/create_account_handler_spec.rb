@@ -10,10 +10,12 @@ require_relative '../../../../lib/stweak/domain/checkpoint'
 require_relative '../../../../lib/stweak/domain/security/password_hasher'
 require_relative '../../../../lib/stweak/ports/event_store'
 require_relative '../../../../lib/stweak/ports/checkpoint_store'
+require_relative '../../../../lib/stweak/ports/usernames'
 require_relative '../../../support/property/domain_generators'
 
 ACCOUNT_OWNER_TYPE = Stweak::Domain::Accounts::Account
 ACCOUNT_ID = Stweak::Domain::Accounts::AccountId.new(value: '00000000-0000-4000-8000-000000000001')
+OTHER_ACCOUNT_ID = Stweak::Domain::Accounts::AccountId.new(value: '00000000-0000-4000-8000-000000000002')
 
 # A run of AccountCreated events at sequences 1..count on one stream, so an
 # account can be replayed to any length — including a checkpoint boundary —
@@ -77,23 +79,30 @@ RSpec.describe Stweak::Domain::Accounts::CreateAccountHandler do
   include DomainPropertyGenerators
 
   subject(:handler) do
-    described_class.new(event_store: event_store, password_hasher: password_hasher, checkpoint_store: checkpoint_store)
+    described_class.new(
+      event_store: event_store,
+      password_hasher: password_hasher,
+      checkpoint_store: checkpoint_store,
+      usernames: usernames
+    )
   end
 
   let(:event_store) { instance_double(Stweak::Ports::EventStore) }
   let(:password_hasher) { instance_double(Stweak::Domain::Security::PasswordHasher) }
   let(:checkpoint_store) { instance_double(Stweak::Ports::CheckpointStore) }
+  let(:usernames) { instance_double(Stweak::Ports::Usernames) }
 
   # Every append the handler makes, in order, so its writes can be inspected
   # and — for the property — replayed back into an account.
   let(:appends) { [] }
 
   before do
-    # A fresh account by default: no checkpoint and an empty stream. Each
-    # example that needs an existing account overrides these.
+    # A fresh account by default: no checkpoint, an empty stream, and a free
+    # username. Each example that needs an existing account overrides these.
     allow(checkpoint_store).to receive(:get).and_return(nil)
     allow(checkpoint_store).to receive(:put)
     allow(event_store).to receive(:read_stream).and_return([])
+    allow(usernames).to receive(:include?).and_return(false)
     allow(password_hasher).to receive(:digest) { |password:| "digest-of-#{password}" }
     allow(event_store).to receive(:append) { |**call| appends << call }
   end
@@ -140,6 +149,24 @@ RSpec.describe Stweak::Domain::Accounts::CreateAccountHandler do
 
   it 'rejects creating the same account twice' do
     allow(event_store).to receive(:read_stream).and_return(account_created_events(ACCOUNT_ID, 1))
+    expect { handler.handle(build_create_account_command(account_id: ACCOUNT_ID, username: 'bob')) }
+      .to raise_error(Stweak::Domain::Accounts::AccountAlreadyExists)
+  end
+
+  it 'rejects a username another account already uses' do
+    allow(usernames).to receive(:include?).with('alice').and_return(true)
+    expect { handler.handle(build_create_account_command(account_id: OTHER_ACCOUNT_ID)) }
+      .to raise_error(Stweak::Domain::Accounts::UsernameTaken, /username alice is already in use/)
+  end
+
+  it 'allows a free username' do
+    account = handler.handle(build_create_account_command(account_id: OTHER_ACCOUNT_ID, username: 'bob'))
+    expect(account.created).to be(true)
+  end
+
+  it 'reports the account conflict, not a username collision, for a recreated account' do
+    allow(event_store).to receive(:read_stream).and_return(account_created_events(ACCOUNT_ID, 1))
+    allow(usernames).to receive(:include?).with('bob').and_return(true)
     expect { handler.handle(build_create_account_command(account_id: ACCOUNT_ID, username: 'bob')) }
       .to raise_error(Stweak::Domain::Accounts::AccountAlreadyExists)
   end
