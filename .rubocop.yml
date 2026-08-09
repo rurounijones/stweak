@@ -3,6 +3,7 @@ plugins:
   - rubocop-rake
   - rubocop-rspec
   - rubocop-sorbet
+  - rubocop-thread_safety
 
 AllCops:
   TargetRubyVersion: 3.4
@@ -36,3 +37,10 @@ Metrics/BlockLength:
 RSpec/SpecFilePathFormat:
   Exclude:
     - 'app/**/spec/**/*'
+
+# The owner registry's @owners map is populated once as the event files are
+# required and only read afterwards, never mutated at runtime, so the shared
+# mutable state this cop guards against does not arise here.
+ThreadSafety/ClassInstanceVariable:
+  Exclude:
+    - 'lib/stweak/domain/owner_registry.rb'
