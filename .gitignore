@@ -2,6 +2,9 @@
 /.bundle/
 /vendor/bundle/
 Gemfile.lock
+# The drivers are applications, not libraries, so their lockfiles are committed
+# to pin the exact gems a driver runs with; the gem and adapters stay unlocked.
+!/app/drivers/*/Gemfile.lock
 
 # Test and coverage output
 /coverage/
@@ -25,3 +28,6 @@ Gemfile.lock
 # Editors and OS
 .DS_Store
 *.swp
+
+# SQLite files created by the data generator
+*.db
