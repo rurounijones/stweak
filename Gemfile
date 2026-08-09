@@ -20,6 +20,7 @@ group :development do
   gem 'rubocop-rake', '~> 0.6', require: false
   gem 'rubocop-rspec', '~> 3.4', require: false
   gem 'rubocop-sorbet', '~> 0.8', require: false
+  gem 'rubocop-thread_safety', '~> 0.7', require: false
   gem 'ruby-lsp', '~> 0.23', require: false
   gem 'sorbet', '~> 0.5', require: false
   gem 'tapioca', '~> 0.16', require: false
