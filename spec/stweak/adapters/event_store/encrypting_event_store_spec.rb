@@ -69,6 +69,14 @@ RSpec.describe Stweak::Adapters::EventStore::EncryptingEventStore do
     expect(store.read_stream(owner_type: owner_type, stream_id: account_id)).to eq([created_event])
   end
 
+  it 'reads only the decrypted tail after a given sequence' do
+    second_event = created_event.with('sequence' => 2, 'username' => 'bob', 'name' => 'Bob')
+    store.append(owner_type: owner_type, stream_id: account_id, expected_version: 0,
+                 events: [created_event, second_event])
+    tail = store.read_stream(owner_type: owner_type, stream_id: account_id, after: 1)
+    expect(tail.map(&:name)).to eq(['Bob'])
+  end
+
   it 'creates a key for the owner on first append' do
     store.append(owner_type: owner_type, stream_id: account_id, expected_version: 0, events: [created_event])
     expect(key_store.get(owner_type: Stweak::Domain::Accounts::Account, owner_id: account_id).bytesize).to eq(32)

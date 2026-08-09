@@ -29,7 +29,8 @@ class SequenceEvent < Stweak::Domain::Event
 end
 
 # A concrete aggregate standing in for the abstract Aggregate base, so the
-# shared behaviour can be exercised directly.
+# shared behaviour can be exercised directly. Its state is the events it has
+# applied, serialized as their sequences so that a checkpoint can restore it.
 class SampleAggregate < Stweak::Domain::Aggregate
   attr_reader :applied_events
 
@@ -45,6 +46,14 @@ class SampleAggregate < Stweak::Domain::Aggregate
   def add(event)
     record(event)
   end
+
+  def checkpoint_state
+    { 'sequences' => @applied_events.map(&:sequence) }
+  end
+
+  def restore(state)
+    @applied_events = state.fetch('sequences').map { |sequence| build_event(sequence) }
+  end
 end
 
 # Builds a minimal event at the given position in the stream.
@@ -54,6 +63,11 @@ def build_event(sequence)
     sequence: sequence,
     occurred_at: Time.utc(2026, 1, 2, 3, 4, 5)
   )
+end
+
+# Builds a run of events at sequences 1..count.
+def events(count)
+  (1..count).map { |sequence| build_event(sequence) }
 end
 
 RSpec.describe Stweak::Domain::Aggregate do
@@ -94,5 +108,47 @@ RSpec.describe Stweak::Domain::Aggregate do
   it 'applies a recorded event' do
     aggregate.add(build_event(1))
     expect(aggregate.applied_events).to eq([build_event(1)])
+  end
+
+  it 'produces a checkpoint once a hundred events are replayed' do
+    checkpoint = SampleAggregate.replay(id: AGGREGATE_ID, events: events(100)).checkpoint
+    expect(checkpoint.version).to eq(100)
+  end
+
+  it 'checkpoints the state at the hundredth event' do
+    checkpoint = SampleAggregate.replay(id: AGGREGATE_ID, events: events(100)).checkpoint
+    expect(checkpoint.state).to eq('sequences' => (1..100).to_a)
+  end
+
+  it 'produces no checkpoint before a hundred events' do
+    rebuilt = SampleAggregate.replay(id: AGGREGATE_ID, events: events(50))
+    expect(rebuilt.checkpoint).to be_nil
+  end
+
+  it 'produces no checkpoint at version zero' do
+    expect(aggregate.checkpoint).to be_nil
+  end
+
+  it 'restoring from a checkpoint and replaying the tail equals a full replay' do
+    full = SampleAggregate.replay(id: AGGREGATE_ID, events: events(150))
+    checkpoint = SampleAggregate.replay(id: AGGREGATE_ID, events: events(100)).checkpoint
+    restored = SampleAggregate.replay(id: AGGREGATE_ID, events: events(150).drop(100), checkpoint: checkpoint)
+    expect(restored.applied_events).to eq(full.applied_events)
+  end
+
+  it 'does not re-apply events already covered by a checkpoint' do
+    checkpoint = SampleAggregate.replay(id: AGGREGATE_ID, events: events(100)).checkpoint
+    rebuilt = SampleAggregate.replay(id: AGGREGATE_ID, events: events(150), checkpoint: checkpoint)
+    expect(rebuilt.applied_events).to eq(events(150))
+  end
+
+  it 'produces a checkpoint after recording the hundredth event' do
+    rebuilt = SampleAggregate.replay(id: AGGREGATE_ID, events: events(99))
+    rebuilt.add(build_event(100))
+    expect(rebuilt.checkpoint.version).to eq(100)
+  end
+
+  it 'declares no checkpoint PII fields by default' do
+    expect(SampleAggregate.checkpoint_pii_fields).to eq([])
   end
 end
