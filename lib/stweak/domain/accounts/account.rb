@@ -104,6 +104,45 @@ module Stweak
             raise ArgumentError, "account #{id} does not know event #{event.class}"
           end
         end
+
+        # The account's state, serialized to a plain hash for a checkpoint.
+        # The display name and the email are personal data, so a durable
+        # checkpoint store must encrypt them — the same crypto-shredding
+        # boundary as the event store.
+        #
+        # @return [Hash{String => Object}]
+        sig { override.returns(T::Hash[String, T.untyped]) }
+        def checkpoint_state
+          {
+            'created' => @created, 'username' => @username, 'password_hash' => @password_hash,
+            'name' => @name, 'email' => @email
+          }
+        end
+
+        # The display name and the email are the account's personal data, so a
+        # durable checkpoint store must encrypt them — the crypto-shredding
+        # boundary named on checkpoint_state above.
+        #
+        # @return [Array<Symbol>]
+        sig { override.returns(T::Array[Symbol]) }
+        def self.checkpoint_pii_fields
+          %i[name email]
+        end
+
+        # Hydrate the account's state from a checkpoint, so that replaying only
+        # the events after the checkpoint gives the same account as replaying
+        # the whole stream.
+        #
+        # @param state [Hash{String => Object}] the serialized state from a
+        #   checkpoint
+        sig { override.params(state: T::Hash[String, T.untyped]).void }
+        def restore(state)
+          @created = state.fetch('created')
+          @username = state.fetch('username')
+          @password_hash = state.fetch('password_hash')
+          @name = state.fetch('name')
+          @email = state.fetch('email')
+        end
       end
     end
   end

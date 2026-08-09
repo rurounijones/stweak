@@ -12,6 +12,41 @@ class OtherAccountEvent < Stweak::Domain::Event
   end
 end
 
+# An AccountCreated event at the given position in a stream, with a username
+# and name derived from its sequence.
+def build_created_event(account_id, occurred_at, sequence)
+  Stweak::Domain::Accounts::AccountCreated.new(
+    stream_id: account_id, sequence: sequence, occurred_at: occurred_at, account_id: account_id,
+    username: "user-#{sequence}", password_hash: 'hash', name: "Name #{sequence}",
+    email: "user#{sequence}@example.com"
+  )
+end
+
+# A run of AccountCreated events at sequences 1..count on one stream.
+def created_events(account_id, occurred_at, count)
+  (1..count).map { |sequence| build_created_event(account_id, occurred_at, sequence) }
+end
+
+# An account rebuilt by replaying a run of created events.
+def replayed_account(account_id, occurred_at, count)
+  Stweak::Domain::Accounts::Account.replay(id: account_id, events: created_events(account_id, occurred_at, count))
+end
+
+# An account rebuilt from a checkpoint, replaying only the events after it.
+def restored_from(checkpoint, account_id, occurred_at, count)
+  Stweak::Domain::Accounts::Account.replay(
+    id: account_id,
+    events: created_events(account_id, occurred_at, count).drop(checkpoint.version),
+    checkpoint: checkpoint
+  )
+end
+
+# The state an account exposes, for comparing a restored account with a
+# replayed one.
+def state_fields(account)
+  [account.created, account.username, account.name, account.email, account.password_hash]
+end
+
 RSpec.describe Stweak::Domain::Accounts::Account do
   subject(:account) { described_class.new(id: account_id) }
 
@@ -139,6 +174,48 @@ RSpec.describe Stweak::Domain::Accounts::Account do
       other = OtherAccountEvent.new(stream_id: account_id, sequence: 1, occurred_at: occurred_at)
       expect { described_class.replay(id: account_id, events: [other]) }
         .to raise_error(ArgumentError, /#{account_id}.*does not know event OtherAccountEvent/)
+    end
+  end
+
+  describe 'checkpointing' do
+    it 'restores its state from a checkpoint' do
+      account.restore(
+        'created' => true, 'username' => 'alice', 'password_hash' => 'hash', 'name' => 'Alice',
+        'email' => 'alice@example.com'
+      )
+      expect(state_fields(account)).to eq([true, 'alice', 'Alice', 'alice@example.com', 'hash'])
+    end
+
+    it 'restores the created flag from its value, not its presence' do
+      account.restore(
+        'created' => false, 'username' => 'alice', 'password_hash' => 'hash', 'name' => 'Alice',
+        'email' => 'alice@example.com'
+      )
+      expect(account.created).to be(false)
+    end
+
+    it 'checkpoints the state at the hundredth event' do
+      checkpoint = replayed_account(account_id, occurred_at, 100).checkpoint
+      expect(checkpoint.state).to eq(
+        'created' => true, 'username' => 'user-100', 'password_hash' => 'hash', 'name' => 'Name 100',
+        'email' => 'user100@example.com'
+      )
+    end
+
+    it 'produces no checkpoint before a hundred events' do
+      rebuilt = replayed_account(account_id, occurred_at, 50)
+      expect(rebuilt.checkpoint).to be_nil
+    end
+
+    it 'restoring from a checkpoint and replaying the tail equals a full replay' do
+      full = replayed_account(account_id, occurred_at, 150)
+      checkpoint = replayed_account(account_id, occurred_at, 100).checkpoint
+      restored = restored_from(checkpoint, account_id, occurred_at, 150)
+      expect(state_fields(restored)).to eq(state_fields(full))
+    end
+
+    it 'declares its display name and email as checkpoint PII' do
+      expect(described_class.checkpoint_pii_fields).to eq(%i[name email])
     end
   end
 end

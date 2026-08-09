@@ -53,18 +53,29 @@ module Stweak
       end
       def append(owner_type:, stream_id:, expected_version:, events:); end
 
-      # Read a stream back in order.
+      # Read a stream back in order, optionally only the events after a given
+      # sequence. The whole stream is the default, `after: 0`; passing the
+      # sequence a checkpoint is current to reads only the tail after it, so a
+      # resumed aggregate does not read the events its checkpoint already
+      # covers.
       #
       # @param owner_type [Class<Stweak::Domain::Aggregate>] the aggregate class
       #   the stream belongs to
       # @param stream_id [Stweak::Domain::Id] the stream to read
+      # @param after [Integer] the exclusive lower bound on sequence: only
+      #   events whose sequence is greater than this are returned. Defaults to
+      #   0, which returns the whole stream.
       # @return [Array<Stweak::Domain::Event>]
       sig do
         abstract
-          .params(owner_type: T.class_of(Stweak::Domain::Aggregate), stream_id: Stweak::Domain::Id)
+          .params(
+            owner_type: T.class_of(Stweak::Domain::Aggregate),
+            stream_id: Stweak::Domain::Id,
+            after: Integer
+          )
           .returns(T::Array[Stweak::Domain::Event])
       end
-      def read_stream(owner_type:, stream_id:); end
+      def read_stream(owner_type:, stream_id:, after: 0); end
 
       # Yield every stream's events, in per-stream sequence order, together
       # with the owner they belong to. A projection system uses this to bring

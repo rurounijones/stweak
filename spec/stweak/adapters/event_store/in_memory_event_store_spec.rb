@@ -38,6 +38,22 @@ RSpec.describe Stweak::Adapters::EventStore::InMemoryEventStore do
     expect(store.read_stream(owner_type: owner_type, stream_id: account_id)).to eq([event, second_event])
   end
 
+  it 'reads only the events after a given sequence' do
+    store.append(
+      owner_type: owner_type, stream_id: account_id, expected_version: 0,
+      events: [event, second_event]
+    )
+    expect(store.read_stream(owner_type: owner_type, stream_id: account_id, after: 1)).to eq([second_event])
+  end
+
+  it 'excludes the event at the given sequence' do
+    store.append(
+      owner_type: owner_type, stream_id: account_id, expected_version: 0,
+      events: [event, second_event]
+    )
+    expect(store.read_stream(owner_type: owner_type, stream_id: account_id, after: 2)).to eq([])
+  end
+
   it 'returns an empty stream for an unknown id' do
     expect(store.read_stream(owner_type: owner_type, stream_id: other_id)).to eq([])
   end

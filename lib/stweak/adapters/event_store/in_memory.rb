@@ -64,15 +64,21 @@ module Stweak
 
         # @param owner_type [Class<Stweak::Domain::Aggregate>]
         # @param stream_id [String]
+        # @param after [Integer] the exclusive lower bound on sequence; 0 reads
+        #   the whole stream
         # @return [Array<Stweak::Domain::Event>]
         sig do
           override
-            .params(owner_type: T.class_of(Stweak::Domain::Aggregate), stream_id: Stweak::Domain::Id)
+            .params(
+              owner_type: T.class_of(Stweak::Domain::Aggregate),
+              stream_id: Stweak::Domain::Id,
+              after: Integer
+            )
             .returns(T::Array[Stweak::Domain::Event])
         end
-        def read_stream(owner_type:, stream_id:)
+        def read_stream(owner_type:, stream_id:, after: 0)
           @mutex.synchronize do
-            @streams.fetch(owner_type, {}).fetch(stream_id, []).dup
+            @streams.fetch(owner_type, {}).fetch(stream_id, []).select { |event| event.sequence > after }
           end
         end
 
@@ -95,6 +101,18 @@ module Stweak
             end
           end
         end
+
+        sig do
+          override
+            .params(blk: T.proc.params(owner_type: T.class_of(Stweak::Domain::Aggregate),
+                                       stream_id: Stweak::Domain::Id,
+                                       events: T::Array[Stweak::Domain::Event]).void)
+            .void
+        end
+        def each_encrypted_stream(&blk)
+          each_stream(&blk)
+        end
+
         # rubocop:enable Naming/BlockForwarding
 
         private

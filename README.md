@@ -427,6 +427,30 @@ built to be driven two different ways — something local, something network
 callable — without any change to the domain, per the [domain first, adapters
 after](#domain-first-adapters-after) decision.
 
+### Checkpoints are the aggregate's implementation detail
+
+Every 100 events on an aggregate's stream, the aggregate's state is saved to
+the checkpoint store as a checkpoint, so a command handler can resume an
+aggregate from its latest checkpoint plus only the events after it, instead of
+replaying the whole stream. The checkpointing logic is the aggregate's: replay
+restores from a checkpoint and applies only the tail, the aggregate decides
+when one is due, and it serializes its own state. The handler's part is
+mechanical — it passes a stored checkpoint into replay and persists whatever
+checkpoint the aggregate reports after a successful append — so nothing
+outside the aggregate can tell whether a replay used a checkpoint or not. A
+checkpoint is derived data: the event log remains the source of truth, and any
+checkpoint can be discarded and rebuilt.
+
+Two caveats. A checkpoint carries the aggregate's serialized state,
+including personal data such as an account's display name, so a durable
+checkpoint store must encrypt it — the same crypto-shredding boundary as the
+event store. The in-memory checkpoint store holds plaintext, accepted while
+everything is in memory; the encrypting adapter is part of making the
+checkpoint store durable. And the handler reads the whole stream and lets
+replay skip the checkpointed prefix, so a checkpoint saves the replay work but
+not the read; reading only the tail is a store-level range-read optimization
+for when the store goes durable.
+
 ### Observability stays out of the domain
 
 The domain does not log, and it does not emit metrics. Observability is a
@@ -508,11 +532,12 @@ consistency: rules can be enforced within one aggregate, but anything spanning
 several of them has to be handled another way.
 
 **Checkpoint** - a cached copy of an aggregate's state at a point in its
-stream. The write side writes one every 100 events, so a command handler can
-resume an aggregate from its latest checkpoint plus only the events after it,
-rather than by replaying the whole stream. Checkpoints are derived data: the
-event log remains the source of truth, and any checkpoint can be discarded and
-rebuilt. They are a write-side concern and have nothing to do with projections.
+stream. The aggregate writes one every 100 events, as its own implementation
+detail, so a command handler can resume an aggregate from its latest
+checkpoint plus only the events after it, rather than by replaying the whole
+stream. Checkpoints are derived data: the event log remains the source of
+truth, and any checkpoint can be discarded and rebuilt. They are a write-side
+concern and have nothing to do with projections.
 
 **Optimistic concurrency** - allowing concurrent work to proceed without
 locking, on the assumption that conflicts are rare, and detecting them at the

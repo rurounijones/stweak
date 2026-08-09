@@ -26,6 +26,8 @@ matcher:
     - Stweak::Ports::CheckpointStore#delete
     - Stweak::Domain::Security::PasswordHasher#digest
     - Stweak::Domain::Aggregate#apply
+    - Stweak::Domain::Aggregate#restore
+    - Stweak::Domain::Aggregate#checkpoint_state
     - Stweak::Domain::Accounts::Account#id
     - Stweak::Domain::Event#version
     - Stweak::Domain::Event.from_h
