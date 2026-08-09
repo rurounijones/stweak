@@ -432,6 +432,25 @@ built to be driven two different ways — something local, something network
 callable — without any change to the domain, per the [domain first, adapters
 after](#domain-first-adapters-after) decision.
 
+### Command idempotency is derived, not caller-supplied
+
+A retried command should produce its original result, not a fresh error: if a
+client's request times out and is sent again, the second create of the same
+account should return the account, not raise. There is no caller-supplied
+idempotency key — the callers of this domain are not trusted to manage one —
+so the key is derived from the command itself. For `CreateAccount` it is the
+username: the account id names the aggregate, and the username is what a retry
+carries unchanged. The account stores the username of the command that created
+it, so a retry is recognized by replaying the account and comparing usernames:
+a match returns the account, and a mismatch is a genuine second create and
+raises.
+
+The limitation is the deliberate price of deriving the key from parameters: a
+retry is recognized by the username alone, so one that changed its password or
+display name is still treated as the same command. Hashing makes a password
+incomparable, and the username is the part of the command that names the thing
+being created; this is an idempotency key, not a guarantee of command equality.
+
 ### The read side is fed by a transport, not the event store
 
 The event store emits appended events to a *subscription* — a port that
