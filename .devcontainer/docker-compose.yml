@@ -16,6 +16,12 @@ services:
       - stweak-bundle:/usr/local/bundle
     environment:
       BUNDLE_PATH: /usr/local/bundle
+      # The services are sibling containers, reached by their compose service
+      # names; CI reaches the same services on localhost, so the specs default
+      # to localhost and these override within the dev container.
+      AWS_ENDPOINT_URL: http://dynamodb-local:8000
+      ELASTICMQ_URL: http://elasticmq:9324
+      REDIS_URL: redis://redis:6379
     command: sleep infinity
     depends_on:
       dynamodb-local:
