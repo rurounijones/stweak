@@ -1,0 +1,63 @@
+# The development environment as a compose stack: the dev container (built
+# from Dockerfile, where the editor attaches) plus the three services the app
+# area's real adapters need — DynamoDB Local for the event store, ElasticMQ
+# for the subscription, and Redis for the checkpoint and key stores. SQLite
+# needs no service (it is a file). The dev service mounts the workspace and the
+# shared bundle volume, and its healthcheck-free lifecycle is kept alive by
+# `sleep infinity` so the editor can attach.
+name: stweak
+services:
+  dev:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    volumes:
+      - ..:/workspaces/stweak
+      - stweak-bundle:/usr/local/bundle
+    environment:
+      BUNDLE_PATH: /usr/local/bundle
+    command: sleep infinity
+    depends_on:
+      dynamodb-local:
+        condition: service_healthy
+      elasticmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    ports:
+      - '8000:8000'
+    # curl without -f: the local endpoint answers any HTTP request (even a
+    # 400 for a GET), so a successful connection is enough to prove readiness.
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -s -o /dev/null http://localhost:8000 || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  elasticmq:
+    image: softwaremill/elasticmq-native:latest
+    ports:
+      - '9324:9324'
+    # ElasticMQ answers only SQS requests (a plain GET is a 400), so readiness
+    # is a TCP connect to the port, which the image's busybox nc provides.
+    healthcheck:
+      test: ['CMD', 'nc', '-z', 'localhost', '9324']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  stweak-bundle:
