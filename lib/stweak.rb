@@ -4,6 +4,11 @@
 require 'sorbet-runtime'
 
 require_relative 'stweak/version'
+require_relative 'stweak/domain/error'
+require_relative 'stweak/domain/id'
+require_relative 'stweak/domain/event'
+require_relative 'stweak/domain/command'
+require_relative 'stweak/domain/aggregate'
 
 # Player account management for a theoretical online team PvP game.
 #
