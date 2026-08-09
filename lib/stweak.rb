@@ -17,12 +17,15 @@ require_relative 'stweak/domain/accounts/account_created'
 require_relative 'stweak/domain/accounts/account'
 require_relative 'stweak/domain/accounts/create_account'
 require_relative 'stweak/domain/accounts/create_account_handler'
+require_relative 'stweak/domain/projection'
+require_relative 'stweak/domain/projection_system'
 require_relative 'stweak/domain/owner_registry'
 require_relative 'stweak/ports/checkpoint_store'
 require_relative 'stweak/ports/event_store'
 require_relative 'stweak/ports/event_store_listener'
 require_relative 'stweak/ports/event_subscription'
 require_relative 'stweak/ports/key_store'
+require_relative 'stweak/ports/projection_store'
 
 # Player account management for a theoretical online team PvP game.
 #

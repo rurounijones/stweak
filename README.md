@@ -244,11 +244,12 @@ answered by a read model built from the event log, never by poking at aggregate
 state. Read models are shaped by the questions people want to ask, which is why
 they can be rebuilt and replaced as those questions change.
 
-In practice the domain defines commands, events and projections and says
-nothing about how any of them are delivered. The two sides are developed and
-tested separately, and joined only by the event log between them: nothing on
-the read side knows how a write happens, and nothing on the write side knows
-how its events will eventually be read.
+In practice the domain defines commands, events and aggregates and says nothing
+about how any of them are delivered; the read models, and the projectors that
+maintain them, are application-layer. The two sides are developed and tested
+separately, and joined only by the event log between them: nothing on the read
+side knows how a write happens, and nothing on the write side knows how its
+events will eventually be read.
 
 ### Event versioning
 
@@ -440,8 +441,31 @@ queue, a consumer reads from it, and delivery is out of process. The domain
 depends on the port and nothing else, so the in-memory and queue
 implementations are interchangeable without touching it. Delivery is
 at-least-once — a listener may receive a batch more than once — and tolerating
-that is the listener's job. The projection system, when the read side exists,
-is the natural listener.
+that is the listener's job. The projection system is the natural listener.
+
+### Projections are materialized and durable
+
+The read models are projections: derived data materialized in the projection
+store — a relational database, with an in-memory twin in the domain gem — so
+they can be queried and so they survive a restart. A projection is a
+*projector*: an application-layer handler that turns the events it cares
+about into create/update/delete operations on the read-model table it
+maintains, and ignores the rest, so replaying it over the full log always
+produces the same table. The database therefore looks like a normal
+application database, with one extra table of machinery: `projection_cursors`
+holds one indexed row per (projection, stream) recording the highest sequence
+consumed, so a restarted projector resumes from each stream's cursor instead
+of replaying every stream. The event log remains the source of truth — a
+projection is derived and disposable in the sense that it can be discarded and
+rebuilt from the streams at any time, not in the sense that it is transient.
+The projection system keeps each projector current: it registers on the
+subscription, feeds it the events it has not yet consumed, and persists its
+cursors after every batch. Re-delivered events are skipped by the per-stream
+cursor, so the system is safe under the subscription's at-least-once delivery.
+
+A caveat, the same as the checkpoint store's: a projection that materializes
+personal data would carry it in the projection store, so a durable projection
+store must encrypt it — the same crypto-shredding boundary as the event store.
 
 ### Checkpoints are the aggregate's implementation detail
 
@@ -484,14 +508,14 @@ instrumentation can be swapped in and out without the domain knowing.
 
 ### All datastores are in-memory for now
 
-This phase ships no persistence. The event store, the key store behind it, and
-the checkpoint store are all memory-backed, so nothing survives a restart. That
-is accepted because nothing is persisted anyway: the event store is the only
-record of accounts, and a durable key store would be guarding a log that is
-itself lost on restart. The two-implementations rule above is therefore not yet
-met for any collaborator; the durable implementations — the key store in
-particular, which crypto-shredding's "delete the key" erasure will build on —
-are the obvious next step.
+This phase ships no persistence. The event store, the key store behind it, the
+checkpoint store, and the projection store are all memory-backed, so nothing
+survives a restart. That is accepted because nothing is persisted anyway: the
+event store is the only record of accounts, and a durable key store would be
+guarding a log that is itself lost on restart. The two-implementations rule
+above is therefore not yet met for any collaborator; the durable
+implementations — the key store in particular, which crypto-shredding's
+"delete the key" erasure will build on — are the obvious next step.
 
 ### Property-based testing, as research
 
@@ -571,17 +595,20 @@ while the present moves on.
 for enforcing rules. Read models are built from events and are never written to
 directly by users of the system.
 
-**Projection** - a read model built by replaying events into a shape convenient
-for querying. Projections are derived and disposable: they can be thrown away
-and rebuilt from the event log at any time, and several different projections
-can be built from the same events. Stats in stweak are a projection.
+**Projection** - a read model built by replaying events into a shape
+convenient for querying. Projections are materialized in a durable projection
+store, yet derived and disposable: the event log remains the source of truth,
+any projection can be thrown away and rebuilt from it at any time, and several
+different projections can be built from the same events. Stats in stweak are a
+projection.
 
 **Projection system** - the machinery that builds and maintains projections:
-it reads events from the log, feeds them to each projection in order, keeps
-track of how far each one has consumed, and rebuilds a projection from the
-beginning when its shape changes or it needs to be replaced. It is what turns
-a projection from a one-off script into something that stays current and can
-be recreated on demand.
+it registers on the event subscription, feeds each projection the events it
+has not yet consumed, keeps each projection's state and per-stream cursors
+durable in the projection store, and rebuilds a projection from the beginning
+when its shape changes or it needs to be replaced. It is what turns a
+projection from a one-off script into something that stays current, survives
+a restart, and can be recreated on demand.
 
 **Idempotency** - the property that doing something twice has the same effect
 as doing it once. It matters here because events may be delivered to a
