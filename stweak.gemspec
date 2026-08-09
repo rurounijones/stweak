@@ -34,4 +34,9 @@ Gem::Specification.new do |spec|
   # Sorbet signatures are evaluated at load time, so the runtime is a genuine
   # dependency of the shipped gem rather than a development tool.
   spec.add_dependency 'sorbet-runtime', '~> 0.5'
+
+  # The encryption and hashing adapters require base64, which Ruby 4.0 ships as
+  # a bundled gem: installed with Ruby but not available under Bundler unless
+  # declared. A consumer of the adapters needs it, so it is a real dependency.
+  spec.add_dependency 'base64', '~> 0.3'
 end

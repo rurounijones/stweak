@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+         <loc>https://rurounijones.github.io/stweak/</loc>
+         <lastmod>2026-08-18</lastmod>
+    </url>
+    <url>
+         <loc>https://rurounijones.github.io/stweak/LICENSE/</loc>
+         <lastmod>2026-08-18</lastmod>
+    </url>
+    <url>
+         <loc>https://rurounijones.github.io/stweak/changelog/</loc>
+         <lastmod>2026-08-18</lastmod>
+    </url>
+    <url>
+         <loc>https://rurounijones.github.io/stweak/design-decisions/</loc>
+         <lastmod>2026-08-18</lastmod>
+    </url>
+    <url>
+         <loc>https://rurounijones.github.io/stweak/developer-guide/</loc>
+         <lastmod>2026-08-18</lastmod>
+    </url>
+    <url>
+         <loc>https://rurounijones.github.io/stweak/event-store-ordering/</loc>
+         <lastmod>2026-08-18</lastmod>
+    </url>
+    <url>
+         <loc>https://rurounijones.github.io/stweak/glossary/</loc>
+         <lastmod>2026-08-18</lastmod>
+    </url>
+</urlset>
