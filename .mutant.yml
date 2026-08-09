@@ -36,6 +36,7 @@ matcher:
     - Stweak::Ports::ProjectionStore#clear
     - Stweak::Ports::ProjectionStore#read_all
     - Stweak::Ports::ProjectionStore#read_row
+    - Stweak::Ports::Usernames#include?
     - Stweak::Domain::Projection#apply
     - Stweak::Domain::Projection#reset
     - Stweak::Ports::KeyStore#get
