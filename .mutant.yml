@@ -18,6 +18,10 @@ matcher:
   ignore:
     - Stweak::Ports::EventStore#append
     - Stweak::Ports::EventStore#read_stream
+    - Stweak::Ports::EventStore#read_all_events
+    - Stweak::Ports::EventStoreListener#on_events_appended
+    - Stweak::Ports::EventSubscription#register
+    - Stweak::Ports::EventSubscription#publish
     - Stweak::Ports::KeyStore#get
     - Stweak::Ports::KeyStore#put
     - Stweak::Ports::KeyStore#delete

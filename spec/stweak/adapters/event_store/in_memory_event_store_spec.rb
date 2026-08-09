@@ -3,9 +3,21 @@
 
 require 'prop_check'
 require_relative '../../../../lib/stweak/adapters/event_store/in_memory'
+require_relative '../../../../lib/stweak/adapters/event_subscription/in_memory'
 require_relative '../../../../lib/stweak/domain/accounts/account'
 require_relative '../../../../lib/stweak/domain/accounts/account_created'
+require_relative '../../../support/event_subscription_examples'
 require_relative '../../../support/property/domain_generators'
+
+# An in-memory store wired to a subscription with one recorded listener,
+# returned with the listener.
+def emitting_in_memory_store
+  listener = SubscribedListener.new
+  subscription = Stweak::Adapters::EventSubscription::InMemoryEventSubscription.new
+  subscription.register(listener: listener)
+  [Stweak::Adapters::EventStore::InMemoryEventStore.new(subscription: subscription), listener]
+end
+
 RSpec.describe Stweak::Adapters::EventStore::InMemoryEventStore do
   include DomainPropertyGenerators
 
@@ -112,6 +124,25 @@ RSpec.describe Stweak::Adapters::EventStore::InMemoryEventStore do
     streams = []
     store.each_stream { |owner, id, events| streams << [owner, id, events] }
     expect(streams).to eq([])
+  end
+
+  it 'publishes an append to a subscription' do
+    emitting, listener = emitting_in_memory_store
+    emitting.append(owner_type: owner_type, stream_id: account_id, expected_version: 0, events: [event])
+    expect(listener.deliveries).to eq([[event]])
+  end
+
+  it 'publishes each append to a subscription' do
+    emitting, listener = emitting_in_memory_store
+    emitting.append(owner_type: owner_type, stream_id: account_id, expected_version: 0, events: [event])
+    emitting.append(owner_type: owner_type, stream_id: account_id, expected_version: 1, events: [second_event])
+    expect(listener.deliveries).to eq([[event], [second_event]])
+  end
+
+  it 'does not publish when it has no subscription' do
+    listener = SubscribedListener.new
+    store.append(owner_type: owner_type, stream_id: account_id, expected_version: 0, events: [event])
+    expect(listener.deliveries).to eq([])
   end
 
   it 'preserves any sequence of events on a stream, in order', :property do
