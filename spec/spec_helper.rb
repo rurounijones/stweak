@@ -31,6 +31,7 @@ end
 # than examples, and the example tests cover the same behaviour. Mutant is the
 # only context that sets SKIP_COVERAGE, so it doubles as the flag for this.
 require 'stweak'
+require_relative 'support/sorbet_doubles'
 
 RSpec.configure do |config|
   config.disable_monkey_patching!

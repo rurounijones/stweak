@@ -1,0 +1,2672 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Player account management for a theoretical online team PvP game.">
+      
+      
+      
+        <link rel="canonical" href="https://rurounijones.github.io/stweak/event-store-ordering/">
+      
+      
+        <link rel="prev" href="../design-decisions/">
+      
+      
+        <link rel="next" href="../changelog/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Event store ordering - stweak</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#event-store-ordering-central-log-versus-per-stream-storage" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="stweak" class="md-header__button md-logo" aria-label="stweak" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            stweak
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Event store ordering
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/rurounijones/stweak" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href=".." class="md-tabs__link">
+          
+  
+  
+    
+  
+  Home
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../design-decisions/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Design
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../changelog/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../LICENSE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  License
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="stweak" class="md-nav__button md-logo" aria-label="stweak" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    stweak
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/rurounijones/stweak" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href=".." class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_1" id="__nav_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Home
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design-decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Goals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2_2" id="__nav_2_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Topics
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Topics
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event store ordering
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event store ordering
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#abstract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Abstract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-the-central-log-arrangement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. The central-log arrangement
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. The central-log arrangement">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-the-two-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 The two tables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-the-append-transaction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 The append transaction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-the-single-writer-bottleneck" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 The single-writer bottleneck
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-the-role-and-cost-of-the-global-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. The role and cost of the global log
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. The role and cost of the global log">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-what-the-global-log-provides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 What the global log provides
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-total-order-versus-single-writer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Total order versus single writer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-the-cost-to-the-write-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 The cost to the write path
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-related-work-and-practice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Related work and practice
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Related work and practice">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-ordering-guarantees-are-per-aggregate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Ordering guarantees are per-aggregate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-a-global-log-is-a-documented-bottleneck" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 A global log is a documented bottleneck
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-dynamodb-specific-constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 DynamoDB-specific constraints
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4.3 DynamoDB-specific constraints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#431-partition-ceiling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3.1 Partition ceiling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#432-client-side-serialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3.2 Client-side serialization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#433-transaction-capacity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3.3 Transaction capacity
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-global-positions-are-rarely-gap-free" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Global positions are rarely gap-free
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-read-models-consume-histories-not-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 Read models consume histories, not events
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-stream-emission-is-the-standard-production-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 Stream emission is the standard production pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#47-a-global-log-remains-a-legitimate-simplicity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.7 A global log remains a legitimate simplicity
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-design-alternatives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Design alternatives
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Design alternatives">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-native-change-log-dynamodb-streams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Native change log: DynamoDB Streams
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-per-stream-checkpointing-no-global-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Per-stream checkpointing, no global log
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5.2 Per-stream checkpointing, no global log">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#521-cross-entity-projections-under-per-stream-replay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2.1 Cross-entity projections under per-stream replay
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-asynchronous-maintenance-of-the-global-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Asynchronous maintenance of the global log
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5.3 Asynchronous maintenance of the global log">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#531-ordering-by-listener-processing-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3.1 Ordering by listener processing order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#532-ordering-by-commit-timestamp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3.2 Ordering by commit timestamp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#533-the-log-as-a-precomputed-projection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3.3 The log as a precomputed projection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-comparative-evaluation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Comparative evaluation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-recovery-and-rebuild" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Recovery and rebuild
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Recovery and rebuild">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-failure-modes-that-force-a-full-rebuild" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Failure modes that force a full rebuild
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-patterns-that-follow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Patterns that follow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-reversibility-reconstructing-a-log-from-streams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Reversibility: reconstructing a log from streams
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-conclusion-and-recommendations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Conclusion and recommendations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../LICENSE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    License
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#abstract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Abstract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-the-central-log-arrangement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. The central-log arrangement
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. The central-log arrangement">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-the-two-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 The two tables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-the-append-transaction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 The append transaction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-the-single-writer-bottleneck" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 The single-writer bottleneck
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-the-role-and-cost-of-the-global-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. The role and cost of the global log
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. The role and cost of the global log">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-what-the-global-log-provides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 What the global log provides
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-total-order-versus-single-writer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Total order versus single writer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-the-cost-to-the-write-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 The cost to the write path
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-related-work-and-practice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Related work and practice
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Related work and practice">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-ordering-guarantees-are-per-aggregate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Ordering guarantees are per-aggregate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-a-global-log-is-a-documented-bottleneck" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 A global log is a documented bottleneck
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-dynamodb-specific-constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 DynamoDB-specific constraints
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4.3 DynamoDB-specific constraints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#431-partition-ceiling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3.1 Partition ceiling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#432-client-side-serialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3.2 Client-side serialization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#433-transaction-capacity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3.3 Transaction capacity
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-global-positions-are-rarely-gap-free" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Global positions are rarely gap-free
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-read-models-consume-histories-not-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 Read models consume histories, not events
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-stream-emission-is-the-standard-production-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 Stream emission is the standard production pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#47-a-global-log-remains-a-legitimate-simplicity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.7 A global log remains a legitimate simplicity
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-design-alternatives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Design alternatives
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Design alternatives">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-native-change-log-dynamodb-streams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Native change log: DynamoDB Streams
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-per-stream-checkpointing-no-global-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Per-stream checkpointing, no global log
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5.2 Per-stream checkpointing, no global log">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#521-cross-entity-projections-under-per-stream-replay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2.1 Cross-entity projections under per-stream replay
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-asynchronous-maintenance-of-the-global-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Asynchronous maintenance of the global log
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5.3 Asynchronous maintenance of the global log">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#531-ordering-by-listener-processing-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3.1 Ordering by listener processing order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#532-ordering-by-commit-timestamp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3.2 Ordering by commit timestamp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#533-the-log-as-a-precomputed-projection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3.3 The log as a precomputed projection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-comparative-evaluation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Comparative evaluation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-recovery-and-rebuild" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Recovery and rebuild
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Recovery and rebuild">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-failure-modes-that-force-a-full-rebuild" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Failure modes that force a full rebuild
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-patterns-that-follow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Patterns that follow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-reversibility-reconstructing-a-log-from-streams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Reversibility: reconstructing a log from streams
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-conclusion-and-recommendations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Conclusion and recommendations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<!-- markdownlint-disable MD034 -->
+
+<h1 id="event-store-ordering-central-log-versus-per-stream-storage">Event Store Ordering: Central Log versus Per-Stream Storage<a class="headerlink" href="#event-store-ordering-central-log-versus-per-stream-storage" title="Permanent link">&para;</a></h1>
+<h2 id="abstract">Abstract<a class="headerlink" href="#abstract" title="Permanent link">&para;</a></h2>
+<p>Should the stweak event store maintain a central, globally ordered event log
+in addition to per-stream event storage? A central log assigns every event a
+single position in append order, which simplifies projection resume,
+deduplication and deterministic
+replay, but it does so at the cost of serializing every write through one
+counter. On DynamoDB that counter is capable of at most a few hundred
+appends per second. The assessment weighs this cost against the ordering
+guarantees that per-stream storage provides, reviews the principal
+alternatives — a native change log, per-stream checkpointing, and
+asynchronous log maintenance — and examines the recovery and reversibility
+implications of each. It concludes that the only unique service the central
+log provides, a global commit order, is not required by the projections
+this domain defines, and that per-stream storage with order-tolerant
+projections is the simpler and more scalable direction. The choice is
+reversible: a global log can be reconstructed from the streams at low cost
+if a consumer for one should appear.</p>
+<h2 id="1-introduction">1. Introduction<a class="headerlink" href="#1-introduction" title="Permanent link">&para;</a></h2>
+<p>stweak is an event-sourced system: every change is recorded as an immutable
+event appended to a stream, and state is derived by replaying those events.
+The central-log arrangement keeps two tables. The streams table holds each
+aggregate's events in per-stream sequence order. The log table holds every
+event in the system in a single global append order, with positions handed
+out by a counter sentinel. Section 5 assesses arrangements that do without
+the log table.</p>
+<p>The question is whether a central, globally ordered log should be maintained
+at all, or whether the streams table alone is sufficient. The question is
+assessed against the ordering requirements of the projections the domain
+defines, the throughput characteristics of DynamoDB, the practices
+documented in the event-sourcing literature, and the recovery properties
+each arrangement provides.</p>
+<h2 id="2-the-central-log-arrangement">2. The central-log arrangement<a class="headerlink" href="#2-the-central-log-arrangement" title="Permanent link">&para;</a></h2>
+<h3 id="21-the-two-tables">2.1 The two tables<a class="headerlink" href="#21-the-two-tables" title="Permanent link">&para;</a></h3>
+<p>The streams table is keyed by owner and sequence. Its partition key is the
+aggregate class and id, its sort key is the event's sequence number, and a
+version sentinel at sort key zero enforces optimistic concurrency: an
+append is accepted only if the stream is still at the version it was built
+on. The log table is keyed by a constant partition key, its sort key being
+the global position, and a counter sentinel at sort key zero records the
+length of the log.</p>
+<p>Each event carries two timestamps: <code>occurred_at</code>, the time the fact
+happened, set by the handler; and <code>created_at</code>, the time the event was
+committed, stamped by the store at append. This assessment assumes
+<code>created_at</code> is in use.</p>
+<h3 id="22-the-append-transaction">2.2 The append transaction<a class="headerlink" href="#22-the-append-transaction" title="Permanent link">&para;</a></h3>
+<p>Every append is a single DynamoDB transaction. It checks the stream's
+version, writes the events to both tables, and advances the log counter.
+Because the counter is a single item, appends to different streams contend
+on it. Two concurrent appends read the same position; only one counter
+update can win, and the other is rejected with a <code>ConcurrencyError</code> and
+must be retried by the caller.</p>
+<p>The append writes both tables and both sentinels in one transaction:</p>
+<pre class="mermaid"><code>flowchart LR
+    C[command handler] --&gt; A[append]
+    A --&gt; T[append transaction]
+    T --&gt;|version check| VS[(streams sentinel&lt;br/&gt;version at sk 0)]
+    T --&gt;|write events| ST[(streams table&lt;br/&gt;owner, sequence)]
+    T --&gt;|write events| LG[(log table&lt;br/&gt;global position)]
+    T --&gt;|advance counter| LC[(log sentinel&lt;br/&gt;length at sk 0)]</code></pre>
+<h3 id="23-the-single-writer-bottleneck">2.3 The single-writer bottleneck<a class="headerlink" href="#23-the-single-writer-bottleneck" title="Permanent link">&para;</a></h3>
+<p>The consequence is that every write in the system serializes on one item,
+no matter how many streams it touches. This is the single-writer
+bottleneck, and it is the motivation for this assessment.</p>
+<p>Two concurrent appends contend on the counter; only one advances it:</p>
+<pre class="mermaid"><code>sequenceDiagram
+    participant C1 as Append A
+    participant C2 as Append B
+    participant DB as DynamoDB
+    C1-&gt;&gt;DB: read counter, position 10
+    C2-&gt;&gt;DB: read counter, position 10
+    C1-&gt;&gt;DB: transaction: write events, counter to 11
+    DB--&gt;&gt;C1: committed
+    C2-&gt;&gt;DB: transaction: write events, counter to 11
+    DB--&gt;&gt;C2: canceled, condition failed
+    Note over C2: ConcurrencyError, retried</code></pre>
+<h2 id="3-the-role-and-cost-of-the-global-log">3. The role and cost of the global log<a class="headerlink" href="#3-the-role-and-cost-of-the-global-log" title="Permanent link">&para;</a></h2>
+<h3 id="31-what-the-global-log-provides">3.1 What the global log provides<a class="headerlink" href="#31-what-the-global-log-provides" title="Permanent link">&para;</a></h3>
+<p>The global log serves a single consumer: the projection system. Aggregates
+read only their own stream, so the write path never uses the global
+position. The projection system uses it for three purposes:</p>
+<ul>
+<li><strong>resume</strong> — reading everything appended since the last checkpoint;</li>
+<li><strong>deduplication</strong> — skipping re-delivered events by position;</li>
+<li><strong>deterministic replay</strong> — folding events into projections from one
+  ordered feed.</li>
+</ul>
+<h3 id="32-total-order-versus-single-writer">3.2 Total order versus single writer<a class="headerlink" href="#32-total-order-versus-single-writer" title="Permanent link">&para;</a></h3>
+<p>A strict total order over all events requires a single allocator, and a
+single allocator is a single writer. This is the same trade-off Kafka
+makes: order is guaranteed within a partition and only there; global order
+means a single partition and a single producer. Every alternative in this
+document chooses one side of that trade. The question is not whether both
+can be had, but whether the total order is worth the writer.</p>
+<h3 id="33-the-cost-to-the-write-path">3.3 The cost to the write path<a class="headerlink" href="#33-the-cost-to-the-write-path" title="Permanent link">&para;</a></h3>
+<p>The global position is an implementation convenience for the projection
+system that the entire write path pays for. On DynamoDB the cost is
+concrete and is quantified in section 4.3.</p>
+<h2 id="4-related-work-and-practice">4. Related work and practice<a class="headerlink" href="#4-related-work-and-practice" title="Permanent link">&para;</a></h2>
+<h3 id="41-ordering-guarantees-are-per-aggregate">4.1 Ordering guarantees are per-aggregate<a class="headerlink" href="#41-ordering-guarantees-are-per-aggregate" title="Permanent link">&para;</a></h3>
+<p>The founding text of <abbr title="keeping the path that changes things separate from the reads">CQRS</abbr> states the ordering guarantee explicitly. Greg
+Young:</p>
+<blockquote>
+<p>"Order is only assured per a handler within an aggregate root boundary.
+There is no assurance of order between handlers or between aggregates.
+Trying to provide those things leads to the dark side."</p>
+</blockquote>
+<p>The EventFlow FAQ observes that global sequence numbers "don't really make
+sense from a domain perspective": they are an infrastructure convenience,
+not a domain need. The broader literature agrees that global ordering
+across entities is usually unnecessary and harms scalability; ordering is
+per-aggregate or per-partition.</p>
+<h3 id="42-a-global-log-is-a-documented-bottleneck">4.2 A global log is a documented bottleneck<a class="headerlink" href="#42-a-global-log-is-a-documented-bottleneck" title="Permanent link">&para;</a></h3>
+<p>Sources that discuss a single ordered log converge on the same limit.
+Ecotone, describing a global tracking projection: "only one worker can
+advance the cursor at a time. Extra workers create lock contention, not
+throughput." Jet encountered the limit with EventStoreDB — "the log isn't
+partitioned, and the single reader thread becomes a bottleneck" — and
+introduced Kafka as a distribution medium. SoftwareMill lists global
+sequencing as a known scaling limit.</p>
+<h3 id="43-dynamodb-specific-constraints">4.3 DynamoDB-specific constraints<a class="headerlink" href="#43-dynamodb-specific-constraints" title="Permanent link">&para;</a></h3>
+<p>Three constraints stack on a single-partition log. The numbers below were
+verified against the AWS documentation.</p>
+<h4 id="431-partition-ceiling">4.3.1 Partition ceiling<a class="headerlink" href="#431-partition-ceiling" title="Permanent link">&para;</a></h4>
+<p>DynamoDB caps each partition at roughly 1,000 write units per second, and a
+single logical partition key range holds all of it. AWS's own guidance for
+an event store is the <em>streams</em> shape — aggregate id as partition key,
+sequence as sort key, optimistic locking by condition expression — which
+spreads writes across partitions; the log table is the opposite of that
+guidance. Every event in the log table, counter included, shares the one
+constant partition key, so all of them compete for the same budget. AWS's
+write-sharding best practice exists precisely for this situation.</p>
+<h4 id="432-client-side-serialization">4.3.2 Client-side serialization<a class="headerlink" href="#432-client-side-serialization" title="Permanent link">&para;</a></h4>
+<p>The partition ceiling is server-side, and it is not the binding constraint
+on a single event log. Every append must read the counter and then transact
+the write — two sequential blocking round trips — and each append's
+position depends on the previous one's outcome, so the writes cannot be
+pipelined or parallelized. A single synchronous client thread in the same
+AWS Region makes roughly 100 to 1,000 requests per second, bounded by a
+per-request round trip of 2 to 10 milliseconds rather than by the server.
+At a typical 4 to 5 milliseconds per request — connection pooling keeps
+the connection warm, so the figure is the request, not the handshake — one
+second divided by five milliseconds gives a theoretical ceiling of about
+200 requests per second, and an append at two round trips halves that to
+roughly 100 to 125 appends per second. Geographic distance, by raising
+latency to 50 to 200 milliseconds, drops a single thread below 20 requests
+per second. The figures are order-of-magnitude estimates, sufficient for
+the argument rather than measurements of a particular implementation.</p>
+<p>More threads do not rescue the single log, because every append must
+advance the same counter item. Two transactions that touch the same item
+conflict: one wins, and the other fails — the failed condition surfaces as
+a <code>TransactionCanceledException</code>, mapped to <code>ConcurrencyError</code>, while
+overlapping commits can also raise <code>TransactionInProgressException</code>.
+Throughput is serialized on the counter item regardless of how many
+writers are present.</p>
+<h4 id="433-transaction-capacity">4.3.3 Transaction capacity<a class="headerlink" href="#433-transaction-capacity" title="Permanent link">&para;</a></h4>
+<p>A transactional write consumes two write units per item rather than one,
+so the log partition's 1,000 write-unit budget is effectively about 500
+transactional writes per second. One consequence is that the partition
+ceiling is unreachable by design: the counter forbids the concurrent
+writers that would be needed to saturate it. A single transaction can
+group up to 100 actions or 4 MB, which bounds the size of an append batch;
+there is no separate per-second transaction quota.</p>
+<p>Both ceilings sit far below the streams table, where writes spread across
+partitions and appends to different streams never touch the same item.
+Batching is the one mitigation: an append carries many events, so events
+per second scale with batch size even while appends per second stay fixed,
+which is how a single writer sustains volume while remaining bounded by
+the latency above.</p>
+<h3 id="44-global-positions-are-rarely-gap-free">4.4 Global positions are rarely gap-free<a class="headerlink" href="#44-global-positions-are-rarely-gap-free" title="Permanent link">&para;</a></h3>
+<p>When the counter is advanced in the same transaction that writes the
+events, its positions are gap-free — better than most. In
+general, a global position from an auto-increment column is monotonic but
+not gap-free under concurrency: a transaction can reserve position 100 and
+commit slowly while 101 commits first, and a projection that advances past
+the gap loses events permanently. Both Ecotone and Protean (ADR-0025)
+devote design work to not losing events this way. Per-partition tracking
+removes the problem structurally, because optimistic locking guarantees
+gap-free order within an aggregate — which is all a per-entity projection
+needs.</p>
+<h3 id="45-read-models-consume-histories-not-events">4.5 Read models consume histories, not events<a class="headerlink" href="#45-read-models-consume-histories-not-events" title="Permanent link">&para;</a></h3>
+<p>The read side's job is stated by the Software Engineering Stack Exchange:</p>
+<blockquote>
+<p>"Consumers that need state should be consuming histories, not events."</p>
+</blockquote>
+<p>Publish/subscribe is adequate for a consumer that cares about one message
+in isolation. A consumer that builds state reads an ordered history from
+the store and tracks where it left off; push is only a wake-up for
+latency. EventStoreDB's catch-up subscriptions operationalise this: push
+when caught up, pull when behind.</p>
+<p>The caveat matters more than the quote: the sources all keep the durable
+replay. The push feed is never the source of truth. A projection's
+correctness comes from pulling "everything since my checkpoint" from the
+store and tolerating redelivery. The change under discussion is therefore
+not the removal of durable replay, but making it per stream.</p>
+<h3 id="46-stream-emission-is-the-standard-production-pattern">4.6 Stream emission is the standard production pattern<a class="headerlink" href="#46-stream-emission-is-the-standard-production-pattern" title="Permanent link">&para;</a></h3>
+<p>Reading each stream and letting it drive the read side is not a departure
+from practice; it is how the read side is scaled in production. Two
+mechanisms dominate:</p>
+<ul>
+<li><strong>A broker partitioned by aggregate id.</strong> Confluent and Conduktor key
+  messages by aggregate id so each stream keeps its order while streams
+  are processed in parallel. This is Kafka's model: order is guaranteed
+  within a partition, and only there.</li>
+<li><strong>DynamoDB Streams on the streams table.</strong> A native change log that is
+  already partitioned: records for the same key land in the same shard, so
+  per-stream order holds; delivery is at-least-once with resumable
+  per-shard positions. Reference implementations use entity id as
+  partition key, numeric sequence as sort key, and DynamoDB Streams as the
+  fan-out.</li>
+</ul>
+<p>The trade-offs of the native option are a shard lifecycle to manage,
+retention of 24 hours to 7 days (a consumer behind more than that must
+rebuild) and version-sentinel noise: where the streams table carries a
+version sentinel updated on every append, the stream emits a record for
+it too, which the consumer must filter.</p>
+<h3 id="47-a-global-log-remains-a-legitimate-simplicity">4.7 A global log remains a legitimate simplicity<a class="headerlink" href="#47-a-global-log-remains-a-legitimate-simplicity" title="Permanent link">&para;</a></h3>
+<p>Not all practice abandons the global log. EventStoreDB ships the <code>$all</code>
+stream precisely because a single ordered feed is convenient for
+cross-aggregate views, analytics and audit trails, and accepts the
+single-reader bottleneck as the price. SoftwareMill treats a global
+position as a reasonable baseline to outgrow. Keeping the log table is
+defensible at modest scale; it is a single writer by construction, and the
+fix for that is partitioning, which means giving up global order.</p>
+<h2 id="5-design-alternatives">5. Design alternatives<a class="headerlink" href="#5-design-alternatives" title="Permanent link">&para;</a></h2>
+<p>The central-log arrangement of section 2 is one candidate. The three
+directions below remove the single writer from the append path, and all
+three keep the durable per-stream replay, so projections can still resume
+and rebuild. They differ in what happens to the log table and in what the
+projection system resumes from. The write path is identical in all three;
+the read path is where they part:</p>
+<pre class="mermaid"><code>flowchart LR
+    subgraph D1["Direction A: native change log"]
+        direction LR
+        a1[append] --&gt; a2[(streams)]
+        a2 --&gt; a3[DynamoDB Streams]
+        a3 --&gt; a4[projection system]
+    end
+    subgraph D2["Direction B: per-stream checkpoints"]
+        direction LR
+        b1[append] --&gt; b2[(streams)]
+        b2 --&gt; b3[subscription]
+        b3 --&gt; b4[projection system]
+    end
+    subgraph D3["Direction C: asynchronous log"]
+        direction LR
+        c1[append] --&gt; c2[(streams)]
+        c2 --&gt; c3[subscription]
+        c3 --&gt; c5[listener]
+        c5 --&gt; c6[(log table)]
+        c6 --&gt; c4[projection system]
+    end</code></pre>
+<h3 id="51-native-change-log-dynamodb-streams">5.1 Native change log: DynamoDB Streams<a class="headerlink" href="#51-native-change-log-dynamodb-streams" title="Permanent link">&para;</a></h3>
+<p>This direction enables the native change log on the streams table and has
+the projection system consume it; the log table and its counter disappear.
+An append becomes the version check plus the stream writes, so contention
+becomes per-stream only.</p>
+<p>Advantages: the write path is reduced to a single-table conditional write;
+ordering is preserved per stream by the change log; the machinery is
+managed by DynamoDB rather than by the application.</p>
+<p>Disadvantages: there is no global total order; the consumer must manage
+shard lifecycle and the retention window; and the version sentinel emits a
+record on every append that the consumer must filter.</p>
+<p>The change log attaches a timestamp to each record,
+<code>ApproximateCreationDateTime</code>, but it cannot serve as a commit-time key.
+It is a UNIX epoch value rounded down to the closest second — second
+granularity, far coarser than the millisecond ties a store-stamped
+<code>created_at</code> already has to break — and it is approximate by design:
+DynamoDB does not guarantee its accuracy, and the timestamp's order is not
+guaranteed to match the order of the changes. Within the change log,
+ordering is reliable only through the per-item sequence number, and only
+within a shard. A consumer that needs commit-ordered events must therefore
+bring its own store-stamped <code>created_at</code> rather than deriving one from the
+stream record. The Kinesis Data Streams destination is finer — milliseconds
+by default, configurable to microseconds — but its records may arrive out
+of order and duplicated.</p>
+<h3 id="52-per-stream-checkpointing-no-global-log">5.2 Per-stream checkpointing, no global log<a class="headerlink" href="#52-per-stream-checkpointing-no-global-log" title="Permanent link">&para;</a></h3>
+<p>This direction makes the streams table the event log and the subscription
+the live feed. Each projection persists per-stream cursors — a stream
+mapped to the highest sequence consumed — instead of a single integer.
+Deduplication is by event identity. Catch-up and rebuild enumerate streams
+and read each from its cursor; the version sentinels at sort key zero are
+already a complete index of every stream that exists. The <code>read_all_events</code>
+method, the append return value, and the <code>starting_at</code> parameter on the
+subscription all disappear. The direction is transport-agnostic: it works
+over the in-memory and queue subscriptions alike.</p>
+<p>Advantages: no second table, no counter, no contention beyond a single
+stream; checkpoint corruption is bounded to the affected stream rather
+than the whole projection; the direction is reversible (section 7).</p>
+<p>Disadvantages: projections must be order-tolerant across streams; rebuild
+enumerates streams rather than reading one ordered feed; resume state is a
+map of cursors rather than one integer.</p>
+<h4 id="521-cross-entity-projections-under-per-stream-replay">5.2.1 Cross-entity projections under per-stream replay<a class="headerlink" href="#521-cross-entity-projections-under-per-stream-replay" title="Permanent link">&para;</a></h4>
+<p>A replay from scratch folds streams in an arbitrary order, so a projection
+spanning two streams may apply a player's event before its parent
+account's event. The question is what a per-stream replay can and cannot
+reconstruct.</p>
+<p>The relationship itself is in the event, so it reconstructs trivially. A
+player event carries its <code>account_id</code>; the reference is a fact on the
+player's stream that names its parent. A replay that folds the player's
+stream before the account's stream still knows the relationship the moment
+it applies the event, and stores the player row with the reference. A join
+or group-by at query time produces the relationship regardless of fold
+order. References need no ordering at all:</p>
+<pre class="mermaid"><code>flowchart LR
+    subgraph streams["two streams"]
+        direction LR
+        AC[Account stream] --&gt; E1["AccountCreated, carries the account name"]
+        PL[Player stream] --&gt; E2["PlayerCreated, carries the parent account id"]
+    end
+    E1 --&gt; P[projection]
+    E2 --&gt; P
+    P --&gt; T1[(accounts)]
+    P --&gt; T2[(players with account id)]
+    T1 --- J[join]
+    T2 --- J
+    J --&gt; V[player with account name]</code></pre>
+<p>Ordering matters only for denormalized data from the other stream — the
+account's name sitting on the player row. Three order-independent
+techniques cover it:</p>
+<ul>
+<li><strong>Join at query time.</strong> Store accounts and players as separate rows and
+  let the query combine them; the projection store is relational by
+  design. Fold order becomes irrelevant because nothing combines rows at
+  apply time. This is the cheapest answer, and the natural shape for this
+  project.</li>
+<li><strong>Denormalize into the event.</strong> The player event carries the account's
+  display name at creation, so the player row is complete on its own. This
+  is the "include data in events" pattern, which exists precisely to make
+  cross-entity projections order-independent. Later renames propagate as
+  account events that update dependent rows; those are idempotent per-key
+  upserts, order-independent by construction.</li>
+<li><strong>Deferred refill.</strong> Apply in any order; when a player row references an
+  account whose data is not yet in the read model, leave the field empty
+  and record the pending reference; when the account's events arrive,
+  refill the dependent rows. The state converges to that of a global-order
+  replay, with fields filling in later. It requires tracking pending
+  references — real machinery, but bounded.</li>
+</ul>
+<p>The edge case a per-stream replay cannot reconstruct is a cross-stream
+point-in-time value: "the account's name as of when the player was
+created", when the player event does not carry it. The account's own
+stream holds only the history of the name, not which name was current at a
+moment defined by an event on a different stream. Reconstructing it needs
+the event to carry the snapshot, a causal link such as the account's
+version at creation, or a global order.</p>
+<p>The general lesson is that the log never did the relationship work; the
+events did. Global order was a convenience that let projections avoid
+order-tolerance. Removing it moves the burden to the events, which must
+carry whatever cross-stream data a projection needs, and to the
+projection, which must converge regardless of fold order. That is a design
+discipline, not a blocker, and it is cheap here because the events are
+still being designed: "if a projection needs data from another stream, the
+event carries it" is the self-contained-events rule the literature
+recommends, and the projections this domain defines are per-entity or
+reference-shaped.</p>
+<h3 id="53-asynchronous-maintenance-of-the-global-log">5.3 Asynchronous maintenance of the global log<a class="headerlink" href="#53-asynchronous-maintenance-of-the-global-log" title="Permanent link">&para;</a></h3>
+<p>This direction keeps the log but stops writing it in the append
+transaction. A listener consumes the emitted events and updates the log on
+its own, so the log lags the streams and appends no longer contend on the
+counter. The write path becomes the version check plus the stream writes,
+exactly as in the other directions. The log stops being part of the write
+and becomes a derived view maintained by consuming the events — a
+materialized replica.</p>
+<p>Three properties of this direction are easy to miss.</p>
+<p>First, the lag requires an out-of-band listener. An in-memory
+subscription calls its listeners synchronously inside append; a
+queue-based subscription enqueues on the write path. A listener registered
+on either runs on the hot path; the log update only becomes asynchronous
+when the listener is a separate consumer — a queue consumer or a DynamoDB
+Streams poller — running its own process.</p>
+<p>Second, the log loses the two properties that justified it. Today the log
+can be trusted because it is written in the same transaction as the
+append: an event is in both tables or neither, and its position is the
+append order. A lagged, listener-maintained log has neither property. A
+projection resuming from it is behind what the subscription already
+delivered and must reconcile the overlap — the low-watermark,
+reprocess-the-overlap technique — and its positions are the listener's
+processing order, which is neither append order nor time order. A global
+position stops meaning anything global. The log is left with a single
+property the streams table already has: it contains every event.</p>
+<p>Third, it is redundant, and it must re-encrypt. Per-stream replay, live
+delivery and idempotent resume already exist at the streams table and the
+subscription; the log adds a lagged third copy. Worse, the subscription
+carries plaintext events — an encrypting store publishes what the domain
+wrote, unencrypted — so a listener copying them into the log would write
+personal data to a durable table in plaintext, breaking the
+crypto-shredding boundary. The
+listener would have to re-encrypt per owner, with the same key-store
+machinery as the event store.</p>
+<h4 id="531-ordering-by-listener-processing-order">5.3.1 Ordering by listener processing order<a class="headerlink" href="#531-ordering-by-listener-processing-order" title="Permanent link">&para;</a></h4>
+<p>If the listener orders the log by the order in which it processes events,
+the log's positions are the listener's processing order. This is a total
+order, but it corresponds to nothing meaningful: neither commit order, nor
+timestamp order, nor causal order. If the projections are order-tolerant,
+any deterministic order produces the correct result and the log is
+redundant; if a projection needs commit or causal order, this ordering
+fails exactly there. The log is redundant where it works and incorrect
+where ordering matters.</p>
+<h4 id="532-ordering-by-commit-timestamp">5.3.2 Ordering by commit timestamp<a class="headerlink" href="#532-ordering-by-commit-timestamp" title="Permanent link">&para;</a></h4>
+<p>Each event carries a store-stamped <code>created_at</code> — the moment it was
+committed — emitted with the event, and the single writer orders the log
+by it behind a settling window. The writer only processes events whose
+commit time has fully passed (for example, those from four to five seconds
+ago), so by the time a batch is handled every event in it is visible, and
+sorting by <code>created_at</code> reproduces commit order closely. This is the
+recognized settle-then-process, low-watermark technique. The stamp is made
+by the store at append; it cannot be recovered from a change log's own
+record timestamp, which is approximate and second-granular (section 5.1).</p>
+<p>The ordering has residual limits. Clock skew is outside the window's
+reach: <code>created_at</code> is written by the committing process, and two
+unsynchronized writers can commit an event later in real time that carries
+an earlier <code>created_at</code>. The window fixes events that are merely not yet
+visible; it cannot fix clocks. A single writer makes this a non-issue,
+and NTP-disciplined writers keep it sub-millisecond, but it is
+unbounded and undetectable from inside the system — the reason distributed
+systems use Lamport or vector clocks rather than wall clocks. Ties within
+a tick also remain: events committed in the same millisecond — every event
+in one append, since they are committed atomically — share a <code>created_at</code>.
+Within a stream, <code>sequence</code> breaks the tie correctly; across streams the
+tie-breaker is arbitrary, so the order is exact up to timestamp resolution
+and no closer. The window itself is a heuristic, not a guarantee: it holds
+while every delivered batch arrives well inside it, and under backpressure
+or a retry storm an event can surface after its window passed and be
+written behind events it precedes. The writer also needs a settling buffer
+with crash recovery — it must hold a few seconds of events and rebuild the
+window from the streams on restart — and it must respect the
+crypto-shredding boundary described above, by consuming the stored
+(encrypted) form or by re-encrypting per owner.</p>
+<h4 id="533-the-log-as-a-precomputed-projection">5.3.3 The log as a precomputed projection<a class="headerlink" href="#533-the-log-as-a-precomputed-projection" title="Permanent link">&para;</a></h4>
+<p>Because every event carries <code>created_at</code>, the log is recomputable from
+the streams by the same sort key the writer uses. Any projection, rebuild
+or ad-hoc query can sort streams by <code>(created_at, tie-breakers)</code> and
+obtain exactly the writer's order, without the writer, the window, or the
+lag. The maintained log is thus a precomputed projection — an optimization,
+not a capability. It is worth keeping only if enough consumers want the
+ordered timeline that precomputing it once beats each of them sorting on
+demand.</p>
+<p>The field and the log are separate decisions. <code>created_at</code> is a property
+of the events, useful on its own and making the ordering the log would
+provide available on demand from the streams. A maintained log with a
+settling writer is only worth keeping when a timeline consumer appears.</p>
+<h3 id="54-comparative-evaluation">5.4 Comparative evaluation<a class="headerlink" href="#54-comparative-evaluation" title="Permanent link">&para;</a></h3>
+<p>Four arrangements are possible. The central log is the only one that
+retains the single writer on the append path; the three directions remove
+it and keep the durable per-stream replay. They differ on the axes below.</p>
+<table>
+<thead>
+<tr>
+<th>Axis</th>
+<th>Central log</th>
+<th>Native change log</th>
+<th>Per-stream checkpoints</th>
+<th>Asynchronous log</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The log table</td>
+<td>kept, written in the append transaction</td>
+<td>removed</td>
+<td>removed</td>
+<td>kept, maintained by a listener</td>
+</tr>
+<tr>
+<td>Ordering the projections see</td>
+<td>global commit order</td>
+<td>per-shard</td>
+<td>per-stream</td>
+<td>one derived sequence, approximate commit order</td>
+</tr>
+<tr>
+<td>Resume state</td>
+<td>single position</td>
+<td>per-shard positions</td>
+<td>per-stream cursors</td>
+<td>single position, behind the lag</td>
+</tr>
+<tr>
+<td>New machinery</td>
+<td>the counter, and its contention</td>
+<td>stream consumer, shard lifecycle</td>
+<td>per-stream cursors</td>
+<td>listener, settling window, buffer, re-encryption</td>
+</tr>
+<tr>
+<td>Permanent lag</td>
+<td>none</td>
+<td>none</td>
+<td>none</td>
+<td>the settling window</td>
+</tr>
+</tbody>
+</table>
+<p>The asynchronous direction buys the same write-path benefit as per-stream
+checkpointing while keeping a redundant table, a listener to operate, lag
+and reconciliation — and even ordered by <code>created_at</code> it does not buy
+back a true total order. It is dominated by per-stream checkpointing
+unless a consumer genuinely needs a global-ordered view and can tolerate
+lag. If such a consumer exists, the appropriate form is a projection — a
+global event log read model, fed by the same subscription, checkpointed
+per stream, rebuildable from the streams table, encrypted like any other
+projection store — not a special listener and a second table.</p>
+<p>The research is unanimous that this trade is correct for a domain whose
+aggregates are per-stream and whose projections are per-entity: a total
+order should be a projection's requirement, paid for by that projection,
+not a tax every write in the system pays.</p>
+<h2 id="6-recovery-and-rebuild">6. Recovery and rebuild<a class="headerlink" href="#6-recovery-and-rebuild" title="Permanent link">&para;</a></h2>
+<h3 id="61-failure-modes-that-force-a-full-rebuild">6.1 Failure modes that force a full rebuild<a class="headerlink" href="#61-failure-modes-that-force-a-full-rebuild" title="Permanent link">&para;</a></h3>
+<p>The recovery story for projections rests on the event source: a projection
+is derived and disposable, so any projection can be thrown away and
+rebuilt at any time. The question is what makes a rebuild necessary.
+Assuming the projection store has backups, as a database normally would,
+backups are not the interesting part: they preserve corruption as
+faithfully as they preserve health. The failure modes that matter are
+logical — the ways the materialized state or its resume position can stop
+being a trustworthy image of the event source.</p>
+<p>The organizing principle is that a full rebuild is required when the
+materialized state or its position can no longer be trusted — either its
+semantics changed, or its correctness is in doubt. Everything else, a
+lagged or missed batch where state and position are still trusted, is
+incremental catch-up, which the central-log arrangement performs from the
+log and the no-log directions from the streams.</p>
+<p>The failure modes fall into the following categories.</p>
+<p><strong>Semantic change.</strong> A projection's shape changes, its logic changes, or a
+new consumer needs a differently shaped read model. This is the intended
+case, what <code>ProjectionSystem#rebuild</code> is for, and what the "derived and
+disposable" principle is built around.</p>
+<p><strong><abbr title="a read model built by replaying events">Projection</abbr> code defects.</strong> A bug in <code>apply</code> that folds events wrongly
+from some point on; a snapshot or restore bug; an idempotency gap that
+double-apply corrupts; ordering sensitivity the delivery did not satisfy.
+A fold that uses the wall-clock or randomness instead of event data is
+non-deterministic and diverges from any replay; the fix is to make it
+deterministic and rebuild.</p>
+<p><strong>Store corruption that survives backups.</strong> A bug in the projection-store
+adapter; a schema migration applied wrongly; silent bit-rot that backup
+validation misses; two projection systems writing to one store; a
+swallowed constraint letting bad rows persist.</p>
+<p><strong><abbr title="cached aggregate state, written every 100 events">Checkpoint</abbr> or position untrustworthiness.</strong> A position persisted ahead
+of applied state, silently skipping events; a position record lost, which
+resumes from zero and is itself a rebuild; position-namespace confusion
+between the global and per-stream designs. The single global position
+amplifies this whole category: one integer is the entire resume state, and
+if it is suspect the whole projection must be rebuilt. Per-stream cursors
+bound the blast radius to the affected stream — an advantage independent
+of the throughput argument.</p>
+<p><strong>Delivery failures that corrupt rather than merely lag.</strong> An out-of-order
+batch applied by a projection that is not order-tolerant; a partially
+applied batch whose position was advanced anyway; a lost batch combined
+with an advanced position; a duplicate applied without idempotency. Plain
+subscription loss does not force a rebuild: the position stays behind and
+catch-up reads the event source to fill the gap. Only corruption ahead of
+the gap does.</p>
+<p><strong>Event-semantics changes.</strong> A change or fix in an upcaster means
+projections materialized under the old upcast logic hold stale data, and
+rebuilding re-upcasts everything. This is the strongest reason a day with
+no change to a projection can still force its rebuild. <abbr title="erasing data by deleting its encryption key">Crypto-shredding</abbr> is
+a second: once an owner's key is gone, the store reads <code>ValueMissing</code>, but
+a projection that already materialized the plaintext still shows it —
+erasure is a rebuild trigger for any projection that materializes personal
+data, which is why the first projection stores only non-PII and why
+durable projection stores must encrypt.</p>
+<p><strong>Detection.</strong> The canonical detector is reconciliation: recompute the
+projection from the event source and diff. Reconciliation is a rebuild, so
+detection and recovery converge; the design should assume any projection
+can be rebuilt at any time and make it cheap and safe. Position anomalies
+and business sanity checks are the lighter detectors.</p>
+<p><strong>Operational error.</strong> A destructive query on the projection store. This
+is where the event source shines: restore from backup to the last good
+point, then catch up — the post-backup delta comes back from the source,
+which is effectively an infinite backup. A deleted position record or a
+recreated store means a full rebuild. Two environments' data merged or
+pointed at the wrong source is a further variant.</p>
+<p><strong>Source-restoration cascades.</strong> If the event source itself was partially
+lost and restored from its own backup, projections must be rebuilt to
+match, because their positions reference the pre-restoration source. This
+exposes the dependency every mode above relies on: a rebuild trusts the
+source absolutely. If the source is wrong — corrupt, partial,
+un-upcastable — the rebuild propagates the wrongness and cannot detect it.
+Source integrity is a prerequisite for the whole recovery story, not part
+of it.</p>
+<h3 id="62-patterns-that-follow">6.2 Patterns that follow<a class="headerlink" href="#62-patterns-that-follow" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Backups are nearly beside the point: the modes that dominate are
+  logical, present in every backup equally. The real guarantee is the
+  event source.</li>
+<li>Detection and rebuild converge, so rebuild must be assumed normal and
+  made cheap and safe.</li>
+<li>The single global position amplifies checkpoint failure into a full
+  rebuild; per-stream cursors bound it.</li>
+<li>The global log makes the rebuild operation trivial — read all in order,
+  apply in order — while per-stream rebuild is resilient to checkpoint
+  loss but requires order-tolerant projections. The trade is symmetric.</li>
+</ul>
+<h2 id="7-reversibility-reconstructing-a-log-from-streams">7. Reversibility: reconstructing a log from streams<a class="headerlink" href="#7-reversibility-reconstructing-a-log-from-streams" title="Permanent link">&para;</a></h2>
+<p>If no log is maintained and a global view is wanted later, it can be built
+back from the streams. The mechanics are a batch job: scan every stream,
+read every event, sort by a deterministic key, and write fresh positions —
+idempotent and re-runnable, days of work rather than a research problem:</p>
+<pre class="mermaid"><code>flowchart LR
+    S[(streams table)] --&gt; SC[scan every stream]
+    SC --&gt; EV[every event: created_at, sequence]
+    EV --&gt; SORT[sort by deterministic key]
+    SORT --&gt; WR[write fresh positions]
+    WR --&gt; L[(reconstructed log)]</code></pre>
+<p>Each event carries <code>created_at</code>, stamped by the store at commit, alongside
+<code>occurred_at</code>, the time the fact happened, and per-stream <code>sequence</code>.
+Within a stream, <code>sequence</code> is authoritative, so reconstruction is
+trivial. Across streams, a deterministic sort key such as <code>(created_at,
+owner_type, stream_id, sequence)</code> yields a stable, rebuildable total
+order: sequence wins inside a stream, commit time interleaves across
+streams, identity breaks ties. Two independent reconstructions agree.</p>
+<p>A reconstruction recovers commit order closely but not exactly. Events
+committed in the same millisecond — every event in one append, since they
+are committed atomically — share a <code>created_at</code>, so cross-stream order
+within a tick is a tie-breaker rather than commit order; clock skew across
+writers inverts timestamps; and because the store stamps <code>created_at</code> at
+commit, an event recorded for an earlier fact (a backfill) carries a
+<code>created_at</code> later than its neighbours. The reconstructed order is exact
+up to timestamp resolution and no closer. This is the same sort key the
+settling-window log uses; reconstruction and a maintained log converge on
+it.</p>
+<p>The consequence is that dropping the log is not a one-way door. If a global
+view turns out to be needed later, the cost of being wrong is a batch job,
+not a redesign. The only thing permanently forfeited is the ability to
+reconstruct true commit order — and the conclusion of this assessment is
+that nothing should depend on it. The no-log directions are therefore the
+cheaper bet in both directions: they remove the single writer and leave
+the option to materialize a log later at low cost.</p>
+<h2 id="8-conclusion-and-recommendations">8. Conclusion and recommendations<a class="headerlink" href="#8-conclusion-and-recommendations" title="Permanent link">&para;</a></h2>
+<p>The assessment supports the following conclusions.</p>
+<p>First, the ordering guarantee that matters is per-aggregate. Events within
+a stream are ordered; events across streams have no ordering requirement
+that the projections this domain defines depend on. The global commit
+order is the one thing a central log uniquely provides, and it is the one
+thing the domain does not use.</p>
+<p>Second, the cost of providing it is out of proportion to its use. A single
+partition holding every write caps the write path at the low hundreds of
+appends per second — bounded by client-side round-trip latency and halved
+again by transactional capacity consumption — and this is an inherent
+property of any strict total order, not a defect of a particular
+implementation.</p>
+<p>Third, the alternatives — a native change log, per-stream checkpointing,
+or an asynchronously maintained log — all remove the single writer while
+preserving durable per-stream replay. The asynchronous direction is
+dominated by per-stream checkpointing unless a global-ordered consumer
+that tolerates lag exists.</p>
+<p>Fourth, the choice is reversible. A global log can be reconstructed from
+the streams at batch cost, and nearly commit-ordered, because events
+already carry a store-stamped <code>created_at</code>.</p>
+<p>The recommendation is therefore:</p>
+<ul>
+<li><strong>Adopt per-stream ordering and order-tolerant projections</strong>, using the
+  subscription for live delivery and per-stream cursors for resume.</li>
+<li><strong>Build a global view as a projection when a consumer appears</strong>, rather
+  than maintaining one pre-emptively. The cost of being wrong is a batch
+  job.</li>
+</ul>
+<p>The decision ultimately reduces to whether a consumer of a global-ordered
+view exists or is planned. That is a product question, and it is the
+question the open questions below leave to the decision maker.</p>
+<h2 id="9-open-questions">9. Open questions<a class="headerlink" href="#9-open-questions" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Does any projection currently planned need strict cross-stream order, or
+  is per-entity order enough? An audit timeline or analytics feed is the
+  usual reason to want one.</li>
+<li>Under per-stream checkpointing, is a scan of the version sentinels to
+  enumerate streams acceptable at the expected scale?</li>
+<li>Under a native change log, is the retention window acceptable, and is
+  filtering the version-sentinel updates worth the noise?</li>
+<li>Under asynchronous maintenance, who consumes the lagged global log, and
+  is the listener's processing order an acceptable ordering for them?</li>
+<li>Does any planned projection need a cross-stream point-in-time value,
+  such as the parent account's name as of a player's creation? That is the
+  one case a per-stream replay cannot reconstruct from the events alone.</li>
+<li>Is there a mechanism to detect projection divergence from the event
+  source — reconciliation, position anomalies, sanity checks — or is
+  rebuild-on-suspicion the plan?</li>
+</ul>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<p>The following sources informed the analysis; the prose above names them
+where they are used.</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Link</th>
+<th>Supports the point that</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Stack Overflow: do you need a global sequence counter?</td>
+<td>https://stackoverflow.com/questions/2948523/in-cqrs-event-sourced-do-you-need-a-global-sequence-counter-in-the-event-stor</td>
+<td>Greg Young: order is only assured within an aggregate</td>
+</tr>
+<tr>
+<td>EventFlow FAQ</td>
+<td>https://eventflow.readthedocs.io/FAQ.html</td>
+<td>Global sequence numbers are not a domain need</td>
+</tr>
+<tr>
+<td>Software Engineering Stack Exchange: expected order in the read model</td>
+<td>https://softwareengineering.stackexchange.com/questions/373969/cqrs-event-sourcing-how-to-process-events-in-the-expected-order-inside-the-read</td>
+<td>Consume histories, not events</td>
+</tr>
+<tr>
+<td>Stack Overflow: push or pull from the event store</td>
+<td>https://stackoverflow.com/questions/39419410/cqrs-communication-between-contexts-eventstore-push-or-pull</td>
+<td>Pull the ordered history from the authority</td>
+</tr>
+<tr>
+<td>DDD/<abbr title="keeping the path that changes things separate from the reads">CQRS</abbr> group: consume the stream without pub/sub</td>
+<td>https://groups.google.com/g/dddcqrs/c/S_c_eqQElh8</td>
+<td>Pull-based catch-up; rebuild by clearing history</td>
+</tr>
+<tr>
+<td>Ecotone: scaling projections</td>
+<td>https://blog.ecotone.tech/when-one-worker-cant-keep-up-scaling-projections/</td>
+<td>Global cursor is a single-worker bottleneck; per-aggregate tracking scales</td>
+</tr>
+<tr>
+<td>Ecotone: gap detection and consistency</td>
+<td>https://docs.ecotone.tech/modelling/event-sourcing/setting-up-projections/gap-detection-and-consistency</td>
+<td>Global positions can have invisible gaps</td>
+</tr>
+<tr>
+<td>Protean ADR-0025: gap-safe checkpointing</td>
+<td>https://docs.proteanhq.com/adr/0025-all-subscription-gap-safety/</td>
+<td>Never advance past a gap; low-watermark settling</td>
+</tr>
+<tr>
+<td>Tim Derzhavets: PostgreSQL event store</td>
+<td>https://timderzhavets.com/blog/building-a-production-ready-event-store-with-postgresql/</td>
+<td>global_position is monotonic but not gap-free</td>
+</tr>
+<tr>
+<td>Jet: scaling event sourcing</td>
+<td>https://medium.com/@eulerfx/scaling-event-sourcing-at-jet-9c873cac33b8</td>
+<td>Single log is a single-reader bottleneck; fan out via Kafka</td>
+</tr>
+<tr>
+<td>Confluent: event sourcing with Kafka</td>
+<td>https://www.confluent.io/blog/event-sourcing-using-apache-kafka/</td>
+<td>Partition by aggregate id; order per partition</td>
+</tr>
+<tr>
+<td>Confluent: single vs multiple streams</td>
+<td>https://developer.confluent.io/courses/event-design/single-vs-multiple-event-streams/</td>
+<td>Global order means a single partition and single producer</td>
+</tr>
+<tr>
+<td>Conduktor: Kafka patterns and pitfalls</td>
+<td>https://www.conduktor.io/blog/event-sourcing-kafka-patterns-pitfalls</td>
+<td><abbr title="the unit commands are addressed to; guards the rules">Aggregate</abbr>-id keying; lack of native optimistic concurrency</td>
+</tr>
+<tr>
+<td>AWS: <abbr title="keeping the path that changes things separate from the reads">CQRS</abbr> event store with DynamoDB</td>
+<td>https://aws.amazon.com/blogs/database/build-a-cqrs-event-store-with-amazon-dynamodb/</td>
+<td>The streams shape: aggregate pk, sequence sk, condition expressions</td>
+</tr>
+<tr>
+<td>AWS: write sharding best practice</td>
+<td>https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-partition-key-sharding.html</td>
+<td>Hot partition keys need sharding; one pk for all writes is hot</td>
+</tr>
+<tr>
+<td>SingleTable: DynamoDB event sourcing pattern</td>
+<td>https://singletable.dev/blog/pattern-event-sourcing/</td>
+<td>Per-aggregate partition; ~1,000 WCU ceiling per partition</td>
+</tr>
+<tr>
+<td>EventStoreDB docs: reading events and the $all stream</td>
+<td>https://developers.eventstore.com/clients/grpc/reading-events.html</td>
+<td>Global positions exist and contain gaps; catch-up subscriptions</td>
+</tr>
+<tr>
+<td>Zinruss: EventStoreDB projection tuning</td>
+<td>https://www.zinruss.com/eventstoredb-projection-performance-tuning-asynchronous-sharding/</td>
+<td>Global projections are single-threaded; foreachStream partitions</td>
+</tr>
+<tr>
+<td>SoftwareMill: event sourcing storage, part 3</td>
+<td>https://softwaremill.com/things-i-wish-i-knew-when-i-started-with-event-sourcing-part-3-storage/</td>
+<td>Global sequencing is a known scaling limit; a baseline to outgrow</td>
+</tr>
+<tr>
+<td>OneUptime: event store pattern on AWS</td>
+<td>https://oneuptime.com/blog/post/2026-02-12-build-an-event-store-pattern-on-aws/view</td>
+<td>entityId pk, version sk, DynamoDB Streams to Kinesis fan-out</td>
+</tr>
+<tr>
+<td>dynamodb-logs</td>
+<td>https://github.com/JamesKyburz/dynamodb-logs</td>
+<td>Append-only store with DynamoDB Streams to EventBridge</td>
+</tr>
+<tr>
+<td>Frank Steimle: choosing an event store</td>
+<td>https://medium.com/digitalfrontiers/the-good-the-bad-and-the-ugly-how-to-choose-an-event-store-f1f2a3b70b2d</td>
+<td>Global ordering usually not needed, hurts scalability</td>
+</tr>
+<tr>
+<td>Aurena: replay your event streams</td>
+<td>https://www.aurena.tech/en/blog/replay-your-event-streams</td>
+<td>No need for a single system-wide transaction log</td>
+</tr>
+<tr>
+<td>DeBrie: the three DynamoDB limits you need to know</td>
+<td>https://alexdebrie.com/posts/dynamodb-limits</td>
+<td>1,000 WCU / 3,000 RCU per partition; table throughput; adaptive capacity</td>
+</tr>
+<tr>
+<td>AWS docs: DynamoDB transactions, how it works</td>
+<td>https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/transaction-apis.html</td>
+<td>Transactional writes consume 2 WCU per item, even when canceled</td>
+</tr>
+<tr>
+<td>AWS docs: read and write operations</td>
+<td>https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/read-write-operations.html</td>
+<td>Capacity-unit cost of each operation, transactions doubled</td>
+</tr>
+<tr>
+<td>AWS docs: burst and adaptive capacity</td>
+<td>https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/burst-adaptive-capacity.html</td>
+<td>A hot key can claim up to the 1,000/3,000 partition maximum</td>
+</tr>
+<tr>
+<td>AWS docs: key range throughput exceeded</td>
+<td>https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/throttling-key-range-limit-exceeded-mitigation.html</td>
+<td>Hot partitions throttle even with table capacity to spare</td>
+</tr>
+<tr>
+<td>AWS docs: TransactWriteItems API reference</td>
+<td>https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TransactWriteItems.html</td>
+<td>100 actions and 4 MB per transaction; no per-second quota</td>
+</tr>
+<tr>
+<td>AWS Database Blog: optimize transaction resilience</td>
+<td>https://aws.amazon.com/blogs/database/optimize-amazon-dynamodb-transaction-resilience/</td>
+<td>TransactionInProgressException on concurrent same-item transactions</td>
+</tr>
+<tr>
+<td>AWS Database Blog: understanding DynamoDB latency</td>
+<td>https://aws.amazon.com/blogs/database/understanding-amazon-dynamodb-latency/</td>
+<td>Single-digit ms service-side; end-to-end adds network and serialization</td>
+</tr>
+<tr>
+<td>Stack Overflow: what TPS can DynamoDB handle</td>
+<td>https://stackoverflow.com/questions/53843829/what-tps-can-dynamodb-handle</td>
+<td>Single blocking thread is 1000/latency; throughput scales with concurrency</td>
+</tr>
+<tr>
+<td>AWS docs: DynamoDB Streams record</td>
+<td>https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_streams_StreamRecord.html</td>
+<td>ApproximateCreationDateTime is epoch seconds, rounded down to the closest second</td>
+</tr>
+<tr>
+<td>AWS docs: change data capture for DynamoDB Streams</td>
+<td>https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.html</td>
+<td>Ordering guaranteed per item and within a shard, not across shards</td>
+</tr>
+<tr>
+<td>AWS docs: DynamoDB changes to Kinesis</td>
+<td>https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/kds.html</td>
+<td>Kinesis records can arrive out of order and duplicated; timestamp is milliseconds</td>
+</tr>
+<tr>
+<td>Stack Overflow: millisecond-precise timestamp in a DynamoDB stream</td>
+<td>https://stackoverflow.com/questions/67419810/millisecond-precise-timestamp-field-in-dynamodb-stream</td>
+<td>The stream timestamp is approximate; use the sequence number for ordering</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 Jeffrey Jones
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "content.tooltips", "navigation.indexes", "navigation.tabs", "navigation.top", "search.highlight", "search.share"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
