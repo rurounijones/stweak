@@ -7,29 +7,40 @@ same reason.
 
 ## The environment
 
-Everything runs inside the devcontainer. The image built from
-`.devcontainer/Dockerfile` is the only environment with the project's
-dependencies installed; the host Ruby is deliberately not used. This is what
-keeps every machine and CI provably the same.
+Everything runs inside the devcontainer, which is now a compose stack
+(`.devcontainer/docker-compose.yml`): the dev container (built from
+`.devcontainer/Dockerfile`, where the editor attaches and all the tooling runs)
+plus the services the app area's real adapters need — DynamoDB Local, ElasticMQ,
+and Redis. SQLite needs no service; it is a file. The host Ruby is deliberately
+not used. This is what keeps every machine and CI provably the same.
 
-You need Docker. Build the image once:
+You need Docker. Bring the stack up once:
 
-    docker build -t stweak-dev -f .devcontainer/Dockerfile .
+    docker compose -f .devcontainer/docker-compose.yml up -d
 
-Run a command inside the container like this:
+Run a command inside the dev container like this:
 
-    docker run --rm \
-      -v "$PWD":/workspaces/stweak \
-      -v stweak-bundle:/usr/local/bundle \
-      -e BUNDLE_PATH=/usr/local/bundle \
-      -w /workspaces/stweak \
-      stweak-dev \
+    docker compose -f .devcontainer/docker-compose.yml exec dev \
       bash -lc 'bundle install && bundle exec rake'
 
-The `stweak-bundle` volume holds the installed gems, so the `bundle install`
-inside the command is a no-op after the first run. `bundle exec` matters: the
-project uses explicit requires, so the Bundler load path is only applied under
-it.
+The `stweak-bundle` volume holds the installed gems, so `bundle install` is a
+no-op after the first run. `bundle exec` matters: the project uses explicit
+requires, so the Bundler load path is only applied under it.
+
+## The app area
+
+The domain gem lives at the repo root (`lib/`, `spec/`, its own Gemfile). The
+app area is separate: `app/adapters/` holds the real-technology driven
+adapters (one bundle, its own Gemfile and specs), and `app/drivers/<name>/`
+holds each driving application (each its own bundle). Commands run per bundle:
+
+    docker compose -f .devcontainer/docker-compose.yml exec dev \
+      bash -lc 'cd app/adapters && bundle install && bundle exec rspec'
+    docker compose -f .devcontainer/docker-compose.yml exec dev \
+      bash -lc 'cd app/drivers/data_generator && bundle install && bundle exec rspec'
+
+The adapters reach the services on `localhost` (DynamoDB Local on 8000,
+ElasticMQ on 9324, Redis on 6379).
 
 ## The checks
 
