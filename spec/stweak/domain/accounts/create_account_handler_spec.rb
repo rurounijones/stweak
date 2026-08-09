@@ -50,7 +50,11 @@ end
 def build_create_account_command(account_id:, username: 'alice', password: 'hunter2', name: 'Alice',
                                  email: 'alice@example.com')
   Stweak::Domain::Accounts::CreateAccount.new(
-    account_id: account_id, username: username, password: password, name: name, email: email
+    account_id: account_id,
+    username: username,
+    password: password,
+    name: name,
+    email: email
   )
 end
 
@@ -58,8 +62,11 @@ end
 # property can never collide on the username across iterations.
 def command_with_unique_username(command)
   Stweak::Domain::Accounts::CreateAccount.new(
-    account_id: command.account_id, username: "user-#{command.account_id}",
-    password: command.password, name: command.name, email: command.email
+    account_id: command.account_id,
+    username: "user-#{command.account_id}",
+    password: command.password,
+    name: command.name,
+    email: command.email
   )
 end
 
@@ -122,6 +129,11 @@ RSpec.describe Stweak::Domain::Accounts::CreateAccountHandler do
     expect(appends.last).to include(owner_type: ACCOUNT_OWNER_TYPE, stream_id: ACCOUNT_ID, expected_version: 0)
   end
 
+  it 'stamps created_at on the appended event' do
+    handler.handle(build_create_account_command(account_id: ACCOUNT_ID))
+    expect(appended_events(appends, ACCOUNT_ID).first.created_at).to be_within(2).of(Time.now)
+  end
+
   it 'stores the username in the event' do
     handler.handle(build_create_account_command(account_id: ACCOUNT_ID))
     expect(appended_events(appends, ACCOUNT_ID).first.username).to eq('alice')
@@ -169,6 +181,18 @@ RSpec.describe Stweak::Domain::Accounts::CreateAccountHandler do
     allow(usernames).to receive(:include?).with('bob').and_return(true)
     expect { handler.handle(build_create_account_command(account_id: ACCOUNT_ID, username: 'bob')) }
       .to raise_error(Stweak::Domain::Accounts::AccountAlreadyExists)
+  end
+
+  it 'returns the account for a retried create' do
+    allow(event_store).to receive(:read_stream).and_return([account_created_events(ACCOUNT_ID, 1).first])
+    retried = handler.handle(build_create_account_command(account_id: ACCOUNT_ID, username: 'user-1'))
+    expect(account_state(retried)).to eq([true, 'user-1', 'Name 1', 'hash'])
+  end
+
+  it 'does not append a second event for a retried create' do
+    allow(event_store).to receive(:read_stream).and_return([account_created_events(ACCOUNT_ID, 1).first])
+    handler.handle(build_create_account_command(account_id: ACCOUNT_ID, username: 'user-1'))
+    expect(event_store).not_to have_received(:append)
   end
 
   it 'surfaces a concurrent append as AccountAlreadyExists' do

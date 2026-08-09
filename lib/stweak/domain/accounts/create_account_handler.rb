@@ -12,13 +12,13 @@ require_relative '../../ports/event_store'
 module Stweak
   module Domain
     module Accounts
-      # An application service: hashes the command's password, checks the
-      # username against the read model, drives the Account aggregate, and
-      # appends the resulting event to the event store, persisting a checkpoint
-      # after the append when the aggregate reports one due. The command
-      # validated itself when it was built. Driving adapters call this; it is
-      # deliberately built to be driven more than one way without any change to
-      # the domain.
+      # An application service: returns the account for a retried create,
+      # otherwise hashes the command's password, checks the username against
+      # the read model, drives the Account aggregate, and appends the resulting
+      # event to the event store, persisting a checkpoint after the append when
+      # the aggregate reports one due. The command validated itself when it was
+      # built. Driving adapters call this; it is deliberately built to be
+      # driven more than one way without any change to the domain.
       #
       # Checkpointing is the aggregate's implementation detail: the handler
       # passes a stored checkpoint into replay and persists whatever checkpoint
@@ -46,10 +46,13 @@ module Stweak
           @usernames = usernames
         end
 
-        # Handle the command: hash, check the username, create, append.
+        # Handle the command: for a retried create of the same account and
+        # username, return the account as it stands; otherwise hash, check the
+        # username, create, and append.
         #
         # @param command [CreateAccount]
-        # @return [Account] the created account
+        # @return [Account] the created account — or, for a retried create of
+        #   the same account and username, the account as it already stands
         # @raise [AccountAlreadyExists] if the account already exists, whether
         #   known from its state or from a concurrent write
         # @raise [UsernameTaken] if a different account already uses the
@@ -57,6 +60,8 @@ module Stweak
         sig { params(command: CreateAccount).returns(Account) }
         def handle(command)
           account = load_account(command.account_id)
+          return account if idempotent_retry?(account, command)
+
           create_account(account, command)
           append(account)
           account
@@ -65,6 +70,24 @@ module Stweak
         end
 
         private
+
+        # Whether this create is a retry of the one that already produced the
+        # account. There is no caller-supplied idempotency key; the key is
+        # derived from the command, and for CreateAccount it is the username —
+        # the account id names the aggregate, the username is what a retry
+        # carries unchanged. The account stores the username of the command
+        # that created it, so a match means the command has already been
+        # applied and its result can be returned. An account that was never
+        # created has an empty username, which no valid command carries, so the
+        # match alone distinguishes a retry from a fresh create.
+        #
+        # @param account [Account]
+        # @param command [CreateAccount]
+        # @return [Boolean]
+        sig { params(account: Account, command: CreateAccount).returns(T::Boolean) }
+        def idempotent_retry?(account, command)
+          account.username == command.username
+        end
 
         # Rebuild the account from its stream, restoring from a stored
         # checkpoint if one exists and applying only the events after it. When
