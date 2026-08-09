@@ -8,9 +8,31 @@ integration:
 matcher:
   subjects:
     - Stweak*
+  # Port and abstract methods are declarations, not behaviour: their bodies are
+  # never executed (subclasses and implementors provide the real methods), so
+  # no test can pin them and no mutation of them can be killed. Mutating them
+  # would only ever produce false positives. Account#id is the same shape in a
+  # different form: its body is a T.cast that narrows the inherited Id to
+  # AccountId — a type annotation with no runtime behaviour, so removing it is
+  # behaviourally identical and no test can tell the difference.
+  ignore:
+    - Stweak::Ports::EventStore#append
+    - Stweak::Ports::EventStore#read_stream
+    - Stweak::Ports::KeyStore#get
+    - Stweak::Ports::KeyStore#put
+    - Stweak::Ports::KeyStore#delete
+    - Stweak::Domain::Security::PasswordHasher#digest
+    - Stweak::Domain::Aggregate#apply
+    - Stweak::Domain::Accounts::Account#id
+    - Stweak::Domain::Event#version
+    - Stweak::Domain::Event.from_h
 coverage_criteria:
   timeout: false
   process_abort: false
   test_result: true
 mutation:
-  operators: full
+  # `light` is mutant's own default operator set. `full` additionally swaps
+  # `==` for `eql?` (and `first` for `last`), which for value objects built
+  # from strings and hashes is behaviourally equivalent and therefore
+  # unkillable — noise rather than a signal that behaviour is unconstrained.
+  operators: light

@@ -30,8 +30,7 @@ end
 # mutant, which re-runs the suite once per mutation: generated cases are slower
 # than examples, and the example tests cover the same behaviour. Mutant is the
 # only context that sets SKIP_COVERAGE, so it doubles as the flag for this.
-require 'stweak'
-
+require_relative '../lib/stweak'
 RSpec.configure do |config|
   config.disable_monkey_patching!
 
