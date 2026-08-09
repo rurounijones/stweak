@@ -9,6 +9,8 @@ require_relative 'stweak/domain/id'
 require_relative 'stweak/domain/event'
 require_relative 'stweak/domain/command'
 require_relative 'stweak/domain/aggregate'
+require_relative 'stweak/ports/event_store'
+require_relative 'stweak/ports/key_store'
 
 # Player account management for a theoretical online team PvP game.
 #
