@@ -1,0 +1,18 @@
+# frozen_string_literal: true
+
+source 'https://rubygems.org'
+
+# The real-technology driven adapters. They implement the domain's ports, so
+# they depend on the stweak gem; each file requires the technology it uses
+# explicitly, per the project's "explicit requires, no autoloading" discipline.
+gem 'stweak', path: '../..'
+
+gem 'aws-sdk-dynamodb', require: false
+gem 'aws-sdk-sqs', require: false
+gem 'bcrypt', require: false
+gem 'redis', require: false
+gem 'sqlite3', require: false
+
+group :development, :test do
+  gem 'rspec', '~> 3.13', require: false
+end
