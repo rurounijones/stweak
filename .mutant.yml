@@ -21,6 +21,9 @@ matcher:
     - Stweak::Ports::KeyStore#get
     - Stweak::Ports::KeyStore#put
     - Stweak::Ports::KeyStore#delete
+    - Stweak::Ports::CheckpointStore#get
+    - Stweak::Ports::CheckpointStore#put
+    - Stweak::Ports::CheckpointStore#delete
     - Stweak::Domain::Security::PasswordHasher#digest
     - Stweak::Domain::Aggregate#apply
     - Stweak::Domain::Accounts::Account#id
