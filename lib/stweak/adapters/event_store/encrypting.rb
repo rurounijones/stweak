@@ -74,14 +74,20 @@ module Stweak
         # @param owner_type [Class<Stweak::Domain::Aggregate>] the aggregate
         #   class the stream belongs to
         # @param stream_id [String]
+        # @param after [Integer] the exclusive lower bound on sequence; 0 reads
+        #   the whole stream
         # @return [Array<Stweak::Domain::Event>]
         sig do
           override
-            .params(owner_type: T.class_of(Stweak::Domain::Aggregate), stream_id: Stweak::Domain::Id)
+            .params(
+              owner_type: T.class_of(Stweak::Domain::Aggregate),
+              stream_id: Stweak::Domain::Id,
+              after: Integer
+            )
             .returns(T::Array[Stweak::Domain::Event])
         end
-        def read_stream(owner_type:, stream_id:)
-          @store.read_stream(owner_type: owner_type, stream_id: stream_id).map { |event| decrypt(event) }
+        def read_stream(owner_type:, stream_id:, after: 0)
+          @store.read_stream(owner_type: owner_type, stream_id: stream_id, after: after).map { |event| decrypt(event) }
         end
 
         # @yield [owner_type, stream_id, events]

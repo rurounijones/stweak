@@ -38,12 +38,13 @@ class RecordingEventStore
     override
       .params(
         owner_type: T.class_of(Stweak::Domain::Aggregate),
-        stream_id: Stweak::Domain::Id
+        stream_id: Stweak::Domain::Id,
+        after: Integer
       )
       .returns(T::Array[Stweak::Domain::Event])
   end
-  def read_stream(owner_type:, stream_id:)
-    @read = [owner_type, stream_id]
+  def read_stream(owner_type:, stream_id:, after: 0)
+    @read = [owner_type, stream_id, after]
     []
   end
 
@@ -162,10 +163,16 @@ RSpec.describe Stweak::Ports do
       expect(store.appended).to eq([Stweak::Domain::Aggregate, TEST_ID, 0, []])
     end
 
-    it 'accepts an implementor that records a read' do
+    it 'accepts an implementor that records a read, defaulting to the whole stream' do
       store = RecordingEventStore.new
       store.read_stream(owner_type: Stweak::Domain::Aggregate, stream_id: TEST_ID)
-      expect(store.read).to eq([Stweak::Domain::Aggregate, TEST_ID])
+      expect(store.read).to eq([Stweak::Domain::Aggregate, TEST_ID, 0])
+    end
+
+    it 'accepts an implementor that records a read after a sequence' do
+      store = RecordingEventStore.new
+      store.read_stream(owner_type: Stweak::Domain::Aggregate, stream_id: TEST_ID, after: 5)
+      expect(store.read).to eq([Stweak::Domain::Aggregate, TEST_ID, 5])
     end
 
     it 'accepts an implementor that yields each stream' do
