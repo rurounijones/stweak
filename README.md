@@ -444,14 +444,14 @@ instrumentation can be swapped in and out without the domain knowing.
 
 ### All datastores are in-memory for now
 
-This phase ships no persistence. The event store and the key store behind it
-are both memory-backed, so nothing survives a restart. That is accepted because
-nothing is persisted anyway: the event store is the only record of accounts,
-and a durable key store would be guarding a log that is itself lost on restart.
-The two-implementations rule above is therefore not yet met for either
-collaborator; the durable implementations — the key store in particular, which
-crypto-shredding's "delete the key" erasure will build on — are the obvious
-next step.
+This phase ships no persistence. The event store, the key store behind it, and
+the checkpoint store are all memory-backed, so nothing survives a restart. That
+is accepted because nothing is persisted anyway: the event store is the only
+record of accounts, and a durable key store would be guarding a log that is
+itself lost on restart. The two-implementations rule above is therefore not yet
+met for any collaborator; the durable implementations — the key store in
+particular, which crypto-shredding's "delete the key" erasure will build on —
+are the obvious next step.
 
 ### Property-based testing, as research
 
@@ -506,6 +506,13 @@ rules. It is rebuilt by replaying its own event stream, decides whether a
 command is allowed, and emits the resulting events. It is also the boundary of
 consistency: rules can be enforced within one aggregate, but anything spanning
 several of them has to be handled another way.
+
+**Checkpoint** - a cached copy of an aggregate's state at a point in its
+stream. The write side writes one every 100 events, so a command handler can
+resume an aggregate from its latest checkpoint plus only the events after it,
+rather than by replaying the whole stream. Checkpoints are derived data: the
+event log remains the source of truth, and any checkpoint can be discarded and
+rebuilt. They are a write-side concern and have nothing to do with projections.
 
 **Optimistic concurrency** - allowing concurrent work to proceed without
 locking, on the assumption that conflicts are rare, and detecting them at the
