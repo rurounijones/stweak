@@ -19,6 +19,12 @@ Gemfile.lock
 /doc/
 /.yardoc/
 
+# MkDocs build output
+/site/
+
+# Python bytecode from the MkDocs hooks
+__pycache__/
+
 # Sorbet caches and generated RBIs. Shims are hand written and kept.
 /sorbet/rbi/gems/
 /sorbet/rbi/dsl/

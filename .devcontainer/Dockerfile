@@ -25,6 +25,36 @@ ARG MARKDOWNLINT_CLI2_VERSION=0.23.2
 RUN npm install --global --no-audit --no-fund \
   "markdownlint-cli2@${MARKDOWNLINT_CLI2_VERSION}"
 
+# Python for MkDocs, which builds the docs site; the Material theme has no
+# Ruby equivalent worth the trade (same reasoning as the Node comment above).
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-venv \
+  && rm -rf /var/lib/apt/lists/*
+
+# MkDocs and the Material theme, installed into a dedicated virtualenv so the
+# pinned versions are isolated from the system Python. Pinned like the tools
+# below, since pip resolves them separately from any lockfile.
+ARG MKDOCS_VERSION=1.6.1
+ARG MKDOCS_MATERIAL_VERSION=9.7.7
+RUN python3 -m venv /opt/docs \
+  && /opt/docs/bin/pip install --no-cache-dir \
+    "mkdocs==${MKDOCS_VERSION}" \
+    "mkdocs-material==${MKDOCS_MATERIAL_VERSION}"
+# The login shell (bash -lc, which the developer guide uses) resets PATH via
+# /etc/profile, so the venv's bin directory would not be on it. Expose the
+# mkdocs command through /usr/local/bin instead, the same way the base image
+# exposes bundle.
+RUN ln -s /opt/docs/bin/mkdocs /usr/local/bin/mkdocs
+ENV PATH="/opt/docs/bin:$PATH"
+
+# Material prints a warning on every build that MkDocs 2.0 is coming and that
+# it will break the plugin and theming systems. The pin below 2.0 is
+# deliberate — the theme requires mkdocs<2, so there is no supported 2.0
+# upgrade — and the warning is therefore noise, so it is silenced.
+ENV NO_MKDOCS_2_WARNING=1
+
 # typos-cli, for spelling in prose and identifiers.
 ARG TYPOS_VERSION=1.49.0
 RUN set -eux; \

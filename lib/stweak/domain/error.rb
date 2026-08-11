@@ -6,10 +6,10 @@ require 'sorbet-runtime'
 module Stweak
   module Domain
     # The base class for every error the domain raises. Naming the categories
-    # below is what "Errors are part of the contract" (README.md) means in
-    # practice: a caller — a future CLI or HTTP adapter — can rescue this base
-    # for any domain failure, or rescue a category to tell validation from
-    # not-found from conflict without parsing messages.
+    # below is what "Errors are part of the contract" in the design decisions
+    # means in practice: a caller — a future CLI or HTTP adapter — can rescue
+    # this base for any domain failure, or rescue a category to tell validation
+    # from not-found from conflict without parsing messages.
     #
     # Errors here are reserved for genuine failures — something that should not
     # have happened given the rules — and are never used to steer control flow.

@@ -1,0 +1,82 @@
+site_name: stweak
+site_description: Player account management for a theoretical online team PvP game.
+site_url: https://rurounijones.github.io/stweak/
+repo_url: https://github.com/rurounijones/stweak
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - content.tooltips
+    - navigation.indexes
+    - navigation.tabs
+    - navigation.top
+    - search.highlight
+    - search.share
+  palette:
+    - media: '(prefers-color-scheme: light)'
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: '(prefers-color-scheme: dark)'
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+# The glossary tooltip data and the hooks that use it live under docs/ but
+# are data and code, not pages: mkdocs would otherwise build them as
+# documents. The paths below are relative to docs_dir.
+exclude_docs: |
+  hooks/**
+  includes/**
+
+plugins:
+  - search
+
+# Python hooks, run at build time; docs/hooks/tooltips.py appends the
+# glossary tooltip definitions to every page except the glossary.
+hooks:
+  - docs/hooks/tooltips.py
+
+markdown_extensions:
+  # Glossary tooltips: `abbr` renders *[Term]: definition as a hover tooltip.
+  # The definitions are appended to every page except the glossary itself by
+  # the docs/hooks/tooltips.py hook, because pymdownx.snippets' auto_append
+  # has no way to exclude a page. See docs/includes/abbreviations.md.
+  - abbr
+  - admonition
+  - attr_list
+  - footnotes
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  # Mermaid diagrams render from fenced code blocks; the Material theme loads
+  # the runtime itself when a page contains one. This is the theme's own
+  # documented setup, and it is what the README's ER diagram relies on.
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - Home:
+      - index.md
+      - Developer guide: developer-guide.md
+      - Glossary: glossary.md
+  - Design:
+      - Design Goals: design-decisions.md
+      - Topics:
+          - Event store ordering: event-store-ordering.md
+  - Changelog: changelog.md
+  - License: LICENSE.md
+
+copyright: Copyright &copy; 2026 Jeffrey Jones
