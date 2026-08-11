@@ -1,0 +1,63 @@
+name: Publish the docs to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time, and never interrupt one that is in flight: a
+# cancelled deploy would leave Pages serving an older build than the branch.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the docs site
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # MkDocs and the Material theme, pinned exactly as .devcontainer/Dockerfile
+      # does, so the site that deploys is the site that builds locally.
+      - name: Install MkDocs
+        run: pip install "mkdocs==1.6.1" "mkdocs-material==9.7.7"
+
+      # The same env var the Dockerfile sets: the Material theme prints a
+      # warning on every build that MkDocs 2.0 is coming, and --strict would
+      # turn that warning into a failure.
+      - name: Build the site
+        env:
+          NO_MKDOCS_2_WARNING: '1'
+        run: mkdocs build --strict
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload the built site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

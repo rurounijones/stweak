@@ -16,8 +16,8 @@ module Stweak
       # email are personal data and are encrypted at rest. created_at, the time
       # the event was committed, is stamped by the store just before the write.
       class AccountCreated < Event
-        # The schema version of this event. See "Event versioning" in
-        # README.md.
+        # The schema version of this event. See "Event versioning" in the
+        # design decisions.
         VERSION = 1
 
         # The name this event is known by in the log, and the key the durable

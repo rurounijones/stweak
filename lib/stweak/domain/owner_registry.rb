@@ -12,9 +12,9 @@ module Stweak
     # Maps event classes to the aggregate class whose stream they belong to.
     # Centralising the mapping is what lets an event know nothing about its
     # aggregate: Event and each event carry no reference to the class that owns
-    # them, so the require graph stays acyclic — see "Explicit requires" in
-    # README.md. This file is the single source of truth for "which events
-    # exist and who owns them"; a new aggregate registers its events here.
+    # them, so the require graph stays acyclic — see "Explicit requires" in the
+    # design decisions. This file is the single source of truth for "which
+    # events exist and who owns them"; a new aggregate registers its events here.
     module OwnerRegistry
       extend T::Sig
 

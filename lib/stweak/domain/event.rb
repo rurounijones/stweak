@@ -67,7 +67,7 @@ module Stweak
       def type; end
 
       # The schema version of this event. Old versions are upcast on read; see
-      # "Event versioning" in README.md. Subclasses implement.
+      # "Event versioning" in the design decisions. Subclasses implement.
       #
       # @return [Integer]
       sig { abstract.returns(Integer) }
