@@ -20,6 +20,14 @@ globs:
 
 ignores:
   - 'doc/**'
+  # The docs site symlinks the AGPL text in as docs/LICENSE.md. It is a legal
+  # document, not prose, so it is exempt from the style rules like the other
+  # generated and vendor material below.
+  - 'docs/LICENSE.md'
+  # The glossary tooltip definitions are machine-consumed lines, not prose.
+  - 'docs/includes/**'
+  # The mkdocs hook is Python code, not prose.
+  - 'docs/hooks/**'
   - 'sorbet/**'
   - 'vendor/**'
   - 'node_modules/**'

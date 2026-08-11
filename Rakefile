@@ -48,6 +48,13 @@ namespace :doc do
   task :lint do
     sh 'yard-junk --text'
   end
+
+  desc 'Build the docs site with MkDocs and the Material theme into site/'
+  task :site do
+    # --strict turns any warning, such as a link that does not resolve, into
+    # a failure: the docs build should pass or say why.
+    sh 'mkdocs build --strict'
+  end
 end
 
 desc 'Run every check that is fast enough to run constantly'

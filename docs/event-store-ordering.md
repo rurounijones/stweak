@@ -1,11 +1,13 @@
+<!-- markdownlint-disable MD034 -->
+
 # Event Store Ordering: Central Log versus Per-Stream Storage
 
 ## Abstract
 
-This document assesses whether the stweak event store should maintain a
-central, globally ordered event log in addition to per-stream event
-storage. A central log assigns every event a single position in append
-order, which simplifies projection resume, deduplication and deterministic
+Should the stweak event store maintain a central, globally ordered event log
+in addition to per-stream event storage? A central log assigns every event a
+single position in append order, which simplifies projection resume,
+deduplication and deterministic
 replay, but it does so at the cost of serializing every write through one
 counter. On DynamoDB that counter is capable of at most a few hundred
 appends per second. The assessment weighs this cost against the ordering
@@ -29,17 +31,12 @@ event in the system in a single global append order, with positions handed
 out by a counter sentinel. Section 5 assesses arrangements that do without
 the log table.
 
-The existence of the log table is the subject of this document. The
-question is whether a central, globally ordered log should be maintained at
-all, or whether the streams table alone is sufficient. The question is
+The question is whether a central, globally ordered log should be maintained
+at all, or whether the streams table alone is sufficient. The question is
 assessed against the ordering requirements of the projections the domain
 defines, the throughput characteristics of DynamoDB, the practices
 documented in the event-sourcing literature, and the recovery properties
 each arrangement provides.
-
-This document is an assessment rather than a decision. It sets out the
-pros and cons of each arrangement so that a decision can be made against
-the record.
 
 ## 2. The central-log arrangement
 
