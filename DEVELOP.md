@@ -1,9 +1,6 @@
 # Developer guide
 
-How to run everything this project builds and checks. It is written for a
-human starting from a fresh checkout, and it deliberately stays in step with
-what CI runs: `.github/workflows/ci.yml` executes the same commands, for the
-same reason.
+How to run everything this project builds and checks.
 
 ## The environment
 
@@ -71,6 +68,12 @@ out of the default task. Run them when the work warrants it:
 - **YARD** — documentation. `bundle exec rake doc:coverage` requires 100%
   of the public API to be documented; `bundle exec rake doc:lint` runs
   yard-junk over the tags.
+- **MkDocs** — the docs site. `bundle exec rake doc:site` builds it with the
+  Material theme into `site/`. The docs home page lives at `docs/index.md`;
+  this guide, the changelog and the license live at the repo root and are
+  symlinked into the site from `docs/`; the design decisions, the glossary and
+  the topics live directly in `docs/`. Glossary terms show short definitions
+  on hover, drawn from `docs/includes/abbreviations.md`.
 - **Markdown** — `markdownlint-cli2` lints the Markdown, prose at 80 columns
   per `.markdownlint-cli2.yaml`.
 - **Typos** — `typos` checks prose and identifiers for misspellings.
@@ -90,3 +93,6 @@ out of the default task. Run them when the work warrants it:
 request: the specs, the static checks, mutation testing, the dependency audit,
 Markdown and typos, and actionlint. The pinned versions there match the
 devcontainer's, so what passes locally is what runs in CI.
+
+`.github/workflows/pages.yml` publishes the built docs site to GitHub Pages on
+every push to main, using the same pinned MkDocs versions as the devcontainer.

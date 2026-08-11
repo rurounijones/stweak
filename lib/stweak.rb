@@ -32,8 +32,8 @@ require_relative 'stweak/ports/usernames'
 #
 # This gem holds the domain logic and nothing else: no event store, no HTTP
 # layer, no persistence. Those live behind ports and are supplied by whatever
-# drives the domain. See README.md for the architecture and the reasoning
-# behind it.
+# drives the domain. See the documentation in `docs/` for the architecture and
+# the reasoning behind it.
 #
 # Note that nothing here is autoloaded. Every file requires exactly what it
 # uses, so the dependency graph can be read from the source.
