@@ -1,0 +1,25 @@
+# frozen_string_literal: true
+
+source 'https://rubygems.org'
+
+# web_admin is a self-contained, read-only driving application: a small Sinatra
+# web app that reads the account projection and the event log and renders them
+# in a browser. It drives only the domain's read ports, and selects which
+# adapters to drive from a .env file (see .env.example), so the same app can
+# read the real stores or the in-memory ones with no code change.
+gem 'stweak', path: '../../..'
+
+gem 'aws-sdk-dynamodb', require: false
+gem 'dotenv', require: false
+gem 'puma', require: false
+gem 'rackup', require: false
+gem 'redis', require: false
+gem 'sinatra', require: false
+gem 'sqlite3', require: false
+
+group :development, :test do
+  gem 'rack-test', '~> 2.1', require: false
+  gem 'rspec', '~> 3.13', require: false
+  gem 'simplecov', '~> 0.22', require: false
+  gem 'simplecov-lcov', '~> 0.8', require: false
+end

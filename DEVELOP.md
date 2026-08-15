@@ -39,6 +39,43 @@ holds each driving application (each its own bundle). Commands run per bundle:
 The adapters reach the services on `localhost` (DynamoDB Local on 8000,
 ElasticMQ on 9324, Redis on 6379).
 
+### Driver configuration
+
+The drivers pick their adapters from a single shared `.env` in the drivers
+folder. Copy it once:
+
+    cp app/drivers/.env.example app/drivers/.env
+
+Every driver loads that file through `dotenv`, so one edit sets the adapters for
+the whole system. Each collaborator has its own selector — `EVENT_STORE`,
+`PROJECTION_STORE`, `KEY_STORE`, `SUBSCRIPTION`, `CHECKPOINT_STORE` — naming
+`memory` or the real technology and defaulting to the real one; switch them as a
+coherent set (all real, or all memory). `dotenv` does not overwrite variables
+already set, so the dev container's service endpoints win over the file's
+localhost defaults. This is what lets the system be exercised end to end:
+generate data with one driver and read it back with another under whichever
+adapters the file names. The `.env` itself is git-ignored; `.env.example` is
+kept.
+
+### The web admin
+
+`app/drivers/web_admin/` is a read-only Sinatra app that lists accounts from
+the projection, shows one account, and lists its events. Like the data
+generator it selects its adapters from the shared `app/drivers/.env`; being
+read-only it honours the three store selectors and ignores the write-side two.
+Run its specs like any other bundle:
+
+    docker compose -f .devcontainer/docker-compose.yml exec dev \
+      bash -lc 'cd app/drivers/web_admin && bundle install && bundle exec rspec'
+
+Start it (defaults to the real adapters on port 4567):
+
+    docker compose -f .devcontainer/docker-compose.yml exec dev \
+      bash -lc 'cd app/drivers/web_admin && bundle install && bin/web-admin'
+
+It has data to show only after the data generator has run against the same
+stores.
+
 ## The checks
 
 ### Everything at once

@@ -1,0 +1,47 @@
+<div class="mb-6">
+  <a href="/" class="text-sm text-indigo-600 hover:text-indigo-800">← All accounts</a>
+</div>
+
+<section class="rounded-lg border border-slate-200 bg-white shadow-sm p-6 mb-8">
+  <h1 class="text-2xl font-semibold text-slate-900 mb-1"><%= display(@account[:name]) %></h1>
+  <p class="text-slate-500 mb-4">@<%= @account[:username] %></p>
+  <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+    <div>
+      <dt class="text-slate-400">Account id</dt>
+      <dd class="font-mono text-slate-700 break-all"><%= @account[:account_id] %></dd>
+    </div>
+    <div>
+      <dt class="text-slate-400">Email</dt>
+      <dd class="text-slate-700"><%= display(@account[:email]) %></dd>
+    </div>
+    <div>
+      <dt class="text-slate-400">Created</dt>
+      <dd class="text-slate-700"><%= @account[:created_at] %></dd>
+    </div>
+  </dl>
+</section>
+
+<section>
+  <h2 class="text-lg font-semibold text-slate-900 mb-1">Events</h2>
+  <p class="text-slate-500 mb-4"><%= @events.length %> event<%= 's' unless @events.length == 1 %> on this account's stream</p>
+
+  <ol class="space-y-4">
+    <% @events.each do |event| %>
+      <li class="rounded-lg border border-slate-200 bg-white shadow-sm p-5">
+        <div class="flex items-baseline justify-between mb-3">
+          <span class="font-semibold text-slate-900"><%= event.type %></span>
+          <span class="text-xs text-slate-400">#<%= event.sequence %> · <%= event.occurred_at.iso8601 %></span>
+        </div>
+        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+          <% event.to_h.each do |key, value| %>
+            <% next if %w[type sequence occurred_at version].include?(key) %>
+            <div>
+              <dt class="text-slate-400"><%= key %></dt>
+              <dd class="text-slate-700 break-all font-mono text-xs"><%= display(value) %></dd>
+            </div>
+          <% end %>
+        </dl>
+      </li>
+    <% end %>
+  </ol>
+</section>
