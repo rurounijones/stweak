@@ -1,0 +1,14 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Start the read-only web admin. Adapter selection and the port come from the
+# shared drivers .env (see ../../.env.example); this just launches rackup
+# against config.ru.
+
+require 'dotenv'
+Dotenv.load(File.expand_path('../../../.env', __dir__))
+
+port = ENV.fetch('PORT', '4567')
+config = File.expand_path('../config.ru', __dir__)
+
+exec('bundle', 'exec', 'rackup', '--host', '0.0.0.0', '--port', port, config)
