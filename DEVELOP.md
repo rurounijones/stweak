@@ -39,6 +39,26 @@ holds each driving application (each its own bundle). Commands run per bundle:
 The adapters reach the services on `localhost` (DynamoDB Local on 8000,
 ElasticMQ on 9324, Redis on 6379).
 
+### The web admin
+
+`app/drivers/web_admin/` is a read-only Sinatra app that lists accounts from
+the projection, shows one account, and lists its events. Unlike the other
+bundles it chooses its adapters from a `.env` file (copy `.env.example`), so it
+can read the real stores or the in-memory ones with no code change — the one
+driver where adapter selection is config-driven rather than hard-wired. Run its
+specs like any other bundle:
+
+    docker compose -f .devcontainer/docker-compose.yml exec dev \
+      bash -lc 'cd app/drivers/web_admin && bundle install && bundle exec rspec'
+
+Start it (defaults to the real adapters on port 4567):
+
+    docker compose -f .devcontainer/docker-compose.yml exec dev \
+      bash -lc 'cd app/drivers/web_admin && bundle install && bin/web-admin'
+
+It has data to show only after the data generator has run against the same
+stores.
+
 ## The checks
 
 ### Everything at once

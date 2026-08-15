@@ -373,4 +373,34 @@ because it looks like a good fit, not because it is known to be one, and it may
 turn out to be a poor match for this domain or simply more trouble than it is
 worth.
 
+## A driver selects its adapters from the environment
+
+The `web_admin` driver — a small, read-only web view over the account
+projection and the event log — picks its adapters at boot from environment
+variables rather than hard-wiring them the way the data generator does. Each
+collaborator has its own selector: `EVENT_STORE`, `PROJECTION_STORE` and
+`KEY_STORE` each name `memory` or the real technology, defaulting to the real
+one. Swapping an adapter is then an edit to a `.env`, not a change to code, so
+the same driver runs entirely in memory for a demonstration or against the real
+stores to read what the generator produced.
+
+This is what makes the driver a live demonstration of hexagonal architecture
+rather than a description of one: the domain's read ports are driven a second,
+network-facing way, and the technology behind them is chosen from outside
+without the driver's own code knowing which it got. It is the [domain first,
+adapters after](#domain-first-adapters-after) rule turned into something a
+reader can toggle.
+
+Two things follow, both deliberate. The driver loads a `.env` through `dotenv`,
+the only bundle in the project to do so — a departure justified by the driver
+being the one place where adapter choice is a runtime input rather than a wiring
+decision; `dotenv` only populates `ENV`, so the vars are still read with the
+same `ENV.fetch` used everywhere else. And coherence across the selectors is the
+operator's responsibility, not the driver's: the stores should be switched as a
+set, because a real event store against a memory projection reads events but
+shows no accounts, and a memory key store against real ciphertext decrypts a
+person's data to "erased". This is left unenforced on purpose — the driver is a
+demonstration, and machinery to police a `.env` would be ceremony the point does
+not need.
+
 [gdpr]: index.md#gdpr
