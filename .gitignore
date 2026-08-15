@@ -37,3 +37,6 @@ __pycache__/
 
 # SQLite files created by the data generator
 *.db
+
+# Local environment files (web_admin adapter selection); .env.example is kept
+.env

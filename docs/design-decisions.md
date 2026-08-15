@@ -428,6 +428,41 @@ above. The SQLite projection store is a fully relational read-model database
 rather than a keyed blob: read models are rows in their own tables, with
 per-stream cursors in a shared `projection_cursors` table.
 
+## In-memory adapters round-trip like their durable twins
+
+An in-memory adapter is not a shortcut that holds live objects; it is a faithful
+twin of the durable one, and it earns that by round-tripping every value through
+its serialized form on the way in and out. The in-memory event store keeps each
+event's serialized hash rather than the event, and rebuilds it on read; the
+checkpoint store keeps a detached copy of the checkpoint's state and version and
+rebuilds the `Checkpoint`; the key store copies the key in and out; the
+projection store copies each row and cursor set in and out; and the event
+subscription reconstructs each event before delivering it. The consequences are
+the ones the durable stores have for real: only plain, serializable data
+survives, a caller never sees or can mutate the store's own object, and any
+read-path translation runs here too — an older-version event is upcast on a
+store read and on a subscription delivery exactly as it is on the durable
+[event versioning](#event-versioning) path.
+
+The line the twins draw is where the wire codec lives. The serialized form the
+in-memory adapter round-trips through is the *domain's* form — an event's
+`to_h`/`from_h`, a checkpoint's state and version — never JSON or SQL. Those wire
+codecs belong to the durable twin: the DynamoDB store and the SQS transport add
+JSON, the SQLite store adds columns, on top of the same domain form. So the
+domain gem stays free of any wire format, and the in-memory adapter proves the
+behaviour without importing the technology. The one exception is the key store,
+whose value is a raw binary key rather than structured data: there is no
+serialized form to round-trip through, so the copy is a plain `dup` rather than
+a codec.
+
+Neither in-memory adapter needs a type-name registry the way the durable
+transport does. A durable consumer reads bytes off a queue and must resolve a
+class from a type string; an in-memory adapter already holds the live object, so
+it captures the object's own class — the current class for its type, the one
+that knows how to read older versions — and reconstructs through that. The
+asymmetry is deliberate: the two resolve the class differently and both apply
+the same read-path translation.
+
 ## Property-based testing, as research
 
 Property-based testing states what should be true of all inputs and lets the
@@ -440,5 +475,43 @@ In practice the author has no experience with it at all. It is being tried
 because it looks like a good fit, not because it is known to be one, and it may
 turn out to be a poor match for this domain or simply more trouble than it is
 worth.
+
+## Drivers select their adapters from a shared .env
+
+A driver picks its adapters at boot from environment variables rather than
+hard-wiring them. Each collaborator has its own selector: `EVENT_STORE`,
+`PROJECTION_STORE`, `KEY_STORE`, `SUBSCRIPTION` and `CHECKPOINT_STORE` each name
+`memory` or the real technology, defaulting to the real one. Swapping an adapter
+is then an edit to a `.env`, not a change to code, so the same driver runs
+entirely in memory for a demonstration or against the real stores to read what
+the generator produced. A read-only driver reads only the selectors it needs and
+ignores the rest: `web_admin` honours the three store selectors and never looks
+at the write-side two.
+
+The `.env` is a single file shared by every driver, held in the drivers folder
+rather than one per driver. This is the point of the decision, not a convenience:
+the data generator and `web_admin` read the same selectors from the same file, so
+one edit sets the adapters for the whole system and it can be exercised end to
+end — generate against a set of stores, then read them back through the web view
+— under whatever adapters that file names.
+
+This is what makes the drivers a live demonstration of hexagonal architecture
+rather than a description of one: the domain's ports are driven from outside, and
+the technology behind them is chosen without the driver's own code knowing which
+it got. It is the [domain first, adapters after](#domain-first-adapters-after)
+rule turned into something a reader can toggle.
+
+Two things follow, both deliberate. The drivers load the `.env` through `dotenv`
+— the only bundles in the project to do so, a departure justified by a driver
+being where adapter choice is a runtime input rather than a wiring decision.
+`dotenv` only populates `ENV`, and it does not overwrite a variable already set,
+so the vars are still read with the same `ENV.fetch` used everywhere else and the
+dev container's service endpoints win over the file's localhost defaults. And
+coherence across the selectors is the operator's responsibility, not the
+driver's: the stores should be switched as a set, because a real event store
+against a memory projection reads events but shows no accounts, and a memory key
+store against real ciphertext decrypts a person's data to "erased". This is left
+unenforced on purpose — the drivers are a demonstration, and machinery to police
+a `.env` would be ceremony the point does not need.
 
 [gdpr]: index.md#gdpr

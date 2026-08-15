@@ -65,6 +65,12 @@ jobs:
       - name: Run the data generator specs
         run: cd app/drivers/data_generator && bundle exec rspec
 
+      - name: Install the web admin bundle
+        run: cd app/drivers/web_admin && bundle install
+
+      - name: Run the web admin specs
+        run: cd app/drivers/web_admin && bundle exec rspec
+
   static:
     name: Static checks
     runs-on: ubuntu-latest

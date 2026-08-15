@@ -17,8 +17,19 @@ defined in the [glossary][glossary].
 
 ## Project status
 
-Early. The guidelines and the domain model are being written down first, before
-any code exists, so that the code has something to be held to.
+Under way, with the write path built and the read path following it. The Account
+write side is complete — the `CreateAccount` command, its handler and aggregate,
+event versioning, checkpointing and crypto-shredding — and the projection system
+builds read models from the event log. Every collaborator has both of its
+implementations: an in-memory adapter in the gem, and a durable twin in the app
+area — a DynamoDB event store, Redis key and checkpoint stores, an SQLite
+projection store, and an ElasticMQ subscription. Two drivers run it end to
+end: a data generator that produces events in volume, and a read-only web admin
+that reads them back.
+
+Still early in scope. Only the Account is modelled so far; Player, Season and
+Game, and the moderation actions, are yet to come. What is built is held to the
+bar the rest of these documents describe.
 
 ## Architecture and practices
 
