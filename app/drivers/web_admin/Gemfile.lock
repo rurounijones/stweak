@@ -24,6 +24,7 @@ GEM
     aws-sigv4 (1.12.1)
       aws-eventstream (~> 1, >= 1.0.2)
     base64 (0.3.0)
+    bcrypt (3.1.22)
     bigdecimal (4.1.2)
     connection_pool (3.0.2)
     diff-lcs (1.6.2)
@@ -105,6 +106,7 @@ PLATFORMS
 
 DEPENDENCIES
   aws-sdk-dynamodb
+  bcrypt
   dotenv
   puma
   rack-test (~> 2.1)
@@ -124,6 +126,7 @@ CHECKSUMS
   aws-sdk-dynamodb (1.172.0) sha256=a9fb3e2b2f53289d51fc4e26274cb3f675b91dcccfcbf7c3541558003d737610
   aws-sigv4 (1.12.1) sha256=6973ff95cb0fd0dc58ba26e90e9510a2219525d07620c8babeb70ef831826c00
   base64 (0.3.0) sha256=27337aeabad6ffae05c265c450490628ef3ebd4b67be58257393227588f5a97b
+  bcrypt (3.1.22) sha256=1f0072e88c2d705d94aff7f2c5cb02eb3f1ec4b8368671e19112527489f29032
   bigdecimal (4.1.2) sha256=53d217666027eab4280346fba98e7d5b66baaae1b9c3c1c0ffe89d48188a3fbd
   connection_pool (3.0.2) sha256=33fff5ba71a12d2aa26cb72b1db8bba2a1a01823559fb01d29eb74c286e62e0a
   diff-lcs (1.6.2) sha256=9ae0d2cba7d4df3075fe8cd8602a8604993efc0dfa934cff568969efb1909962

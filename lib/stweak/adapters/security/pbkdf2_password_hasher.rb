@@ -39,6 +39,45 @@ module Stweak
 
           "pbkdf2-sha256$#{@iterations}$#{Base64.strict_encode64(salt)}$#{Base64.strict_encode64(derived)}"
         end
+
+        # Verify a password against a PBKDF2 digest, returning false for an
+        # invalid or incompatible stored value.
+        #
+        # @param password [String]
+        # @param digest [String]
+        # @return [Boolean]
+        sig { override.params(password: String, digest: String).returns(T::Boolean) }
+        def verify(password:, digest:)
+          parsed = parse(digest)
+          return false unless parsed
+
+          salt, expected, iteration_count = parsed
+          actual = OpenSSL::PKCS5.pbkdf2_hmac(password, salt, iteration_count, expected.bytesize, 'SHA256')
+          OpenSSL.fixed_length_secure_compare(actual, expected)
+        end
+
+        private
+
+        # Parse a stored digest into its salt, expected hash and iteration
+        # count, or nil for anything malformed or incompatible.
+        #
+        # @param digest [String]
+        # @return [Array(String, String, Integer), nil]
+        sig { params(digest: String).returns(T.nilable([String, String, Integer])) }
+        def parse(digest)
+          algorithm, iterations, encoded_salt, encoded_digest = digest.split('$', -1)
+          return unless algorithm == 'pbkdf2-sha256' && digest.count('$') == 3
+
+          iteration_count = Integer(T.must(iterations))
+          return unless iteration_count.positive?
+
+          expected = Base64.strict_decode64(T.must(encoded_digest))
+          return unless expected.bytesize == 32
+
+          [Base64.strict_decode64(T.must(encoded_salt)), expected, iteration_count]
+        rescue ArgumentError
+          nil
+        end
       end
     end
   end

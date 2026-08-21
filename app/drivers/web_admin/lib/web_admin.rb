@@ -27,6 +27,25 @@ module WebAdmin
     end
     helpers Helpers
 
+    # The login form. Existing pages are intentionally public; this route is a
+    # read-path demonstration for the password hash written by the domain.
+    get '/login' do
+      erb :login
+    end
+
+    post '/login' do
+      @username = params['username']
+      account = settings.reader.authenticate(username: @username, password: params['password'])
+      if account
+        @account = account
+        erb :logged_in
+      else
+        @error = 'Invalid username or password'
+        status 401
+        erb :login
+      end
+    end
+
     # The account list.
     get '/' do
       @accounts = settings.reader.accounts
