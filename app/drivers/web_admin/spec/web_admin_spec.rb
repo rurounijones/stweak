@@ -35,6 +35,13 @@ module Doubles
     end
 
     def account(id) = accounts.find { |row| row[:account_id] == id }
+
+    def authenticate(username:, password:)
+      return unless username == 'ada' && password == 'hunter2'
+
+      account('abc')
+    end
+
     def events(_id) = @events
   end
 end
@@ -61,21 +68,56 @@ RSpec.describe WebAdmin::App do
 
   before { app.set(:reader, Doubles::FakeReader.new(accounts: [account], events: [event])) }
 
-  it 'lists accounts on the home page' do
-    get '/'
+  it 'renders the login form' do
+    get '/login'
 
     aggregate_failures do
       expect(last_response).to be_ok
-      expect(last_response.body).to include('Accounts').and include('ada')
+      expect(last_response.body).to include('Sign in').and include('name="password"')
     end
   end
 
-  it 'shows a blank slate when there are no accounts' do
-    app.set(:reader, Doubles::FakeReader.new(accounts: []))
+  it 'shows a success page for valid credentials' do
+    post '/login', username: 'ada', password: 'hunter2'
 
+    aggregate_failures do
+      expect(last_response).to be_ok
+      expect(last_response.body).to include('Signed in').and include('Ada')
+    end
+  end
+
+  it 'shows a generic error for invalid credentials' do
+    post '/login', username: 'unknown', password: 'wrong'
+
+    aggregate_failures do
+      expect(last_response.status).to eq(401)
+      expect(last_response.body).to include('Invalid username or password')
+    end
+  end
+
+  it 'leaves existing pages public' do
     get '/'
 
-    expect(last_response.body).to include('No accounts to show')
+    expect(last_response).to be_ok
+  end
+
+  it 'does not require a session after a successful login' do
+    post '/login', username: 'ada', password: 'hunter2'
+    get '/accounts/abc'
+
+    expect(last_response).to be_ok
+  end
+
+  it 'preserves the submitted username after a failed login' do
+    post '/login', username: 'unknown', password: 'wrong'
+
+    expect(last_response.body).to include('value="unknown"')
+  end
+
+  it 'does not disclose the password in the login response' do
+    post '/login', username: 'ada', password: 'hunter2'
+
+    expect(last_response.body).not_to include('hunter2')
   end
 
   it 'shows an account with its data and events, dashing shredded fields' do
@@ -87,12 +129,29 @@ RSpec.describe WebAdmin::App do
     end
   end
 
+  it 'shows a blank slate when there are no accounts' do
+    app.set(:reader, Doubles::FakeReader.new(accounts: []))
+
+    get '/'
+
+    expect(last_response.body).to include('No accounts to show')
+  end
+
   it 'returns 404 for an unknown account' do
     get '/accounts/nope'
 
     aggregate_failures do
       expect(last_response.status).to eq(404)
       expect(last_response.body).to include('Not found')
+    end
+  end
+
+  it 'lists accounts on the home page' do
+    get '/'
+
+    aggregate_failures do
+      expect(last_response).to be_ok
+      expect(last_response.body).to include('Accounts').and include('ada')
     end
   end
 end

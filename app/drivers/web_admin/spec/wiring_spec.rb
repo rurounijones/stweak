@@ -44,6 +44,18 @@ RSpec.describe WebAdmin::Wiring do
       ENV['KEY_STORE'] = 'bogus'
       expect { described_class.build_key_store }.to raise_error(described_class::UnknownAdapter, /bogus/)
     end
+
+    it 'rejects an unknown password hasher' do
+      ENV['PASSWORD_HASHER'] = 'bogus'
+      expect { described_class.build_password_hasher }.to raise_error(described_class::UnknownAdapter, /bogus/)
+    end
+  end
+
+  describe 'the password hasher selector' do
+    it 'builds pbkdf2 when selected' do
+      ENV['PASSWORD_HASHER'] = 'pbkdf2'
+      expect(described_class.build_password_hasher).to be_a(Stweak::Adapters::Security::Pbkdf2PasswordHasher)
+    end
   end
 
   # The real adapters need the devcontainer services (DynamoDB Local, Redis);

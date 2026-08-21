@@ -22,39 +22,40 @@ matcher:
   # explicit #name is behaviourally identical and no test can tell the
   # difference.
   ignore:
-    - Stweak::Ports::EventStore#append
-    - Stweak::Ports::EventStore#read_stream
-    - Stweak::Ports::EventStore#each_stream
-    - Stweak::Ports::EventStoreListener#on_events_appended
-    - Stweak::Ports::EventSubscription#register
-    - Stweak::Ports::EventSubscription#publish
-    - Stweak::Ports::ProjectionStore#read
-    - Stweak::Ports::ProjectionStore#write
-    - Stweak::Ports::ProjectionStore#delete
-    - Stweak::Ports::ProjectionStore#upsert
-    - Stweak::Ports::ProjectionStore#delete_row
-    - Stweak::Ports::ProjectionStore#clear
-    - Stweak::Ports::ProjectionStore#read_all
-    - Stweak::Ports::ProjectionStore#read_row
-    - Stweak::Ports::Usernames#include?
-    - Stweak::Domain::Projection#apply
-    - Stweak::Domain::Projection#reset
-    - Stweak::Ports::KeyStore#get
-    - Stweak::Ports::KeyStore#put
-    - Stweak::Ports::KeyStore#delete
-    - Stweak::Ports::CheckpointStore#get
-    - Stweak::Ports::CheckpointStore#put
-    - Stweak::Ports::CheckpointStore#delete
-    - Stweak::Domain::Security::PasswordHasher#digest
-    - Stweak::Domain::Aggregate#apply
-    - Stweak::Domain::Aggregate#restore
-    - Stweak::Domain::Aggregate#checkpoint_state
     - Stweak::Domain::Accounts::Account#id
-    - Stweak::Domain::ProjectionSystem#initialize
-    - Stweak::Domain::ProjectionSystem#stream_key
+    - Stweak::Domain::Aggregate#apply
+    - Stweak::Domain::Aggregate#checkpoint_state
+    - Stweak::Domain::Aggregate#restore
     - Stweak::Domain::Event#type
     - Stweak::Domain::Event#version
     - Stweak::Domain::Event.from_h
+    - Stweak::Domain::Projection#apply
+    - Stweak::Domain::Projection#reset
+    - Stweak::Domain::ProjectionSystem#initialize
+    - Stweak::Domain::ProjectionSystem#stream_key
+    - Stweak::Domain::Security::PasswordHasher#digest
+    - Stweak::Domain::Security::PasswordHasher#verify
+    - Stweak::Ports::CheckpointStore#delete
+    - Stweak::Ports::CheckpointStore#get
+    - Stweak::Ports::CheckpointStore#put
+    - Stweak::Ports::EventStore#append
+    - Stweak::Ports::EventStore#each_stream
+    - Stweak::Ports::EventStore#read_stream
+    - Stweak::Ports::EventStoreListener#on_events_appended
+    - Stweak::Ports::EventSubscription#publish
+    - Stweak::Ports::EventSubscription#register
+    - Stweak::Ports::KeyStore#delete
+    - Stweak::Ports::KeyStore#get
+    - Stweak::Ports::KeyStore#put
+    - Stweak::Ports::ProjectionStore#clear
+    - Stweak::Ports::ProjectionStore#delete
+    - Stweak::Ports::ProjectionStore#delete_row
+    - Stweak::Ports::ProjectionStore#read
+    - Stweak::Ports::ProjectionStore#read_all
+    - Stweak::Ports::ProjectionStore#read_row
+    - Stweak::Ports::ProjectionStore#upsert
+    - Stweak::Ports::ProjectionStore#write
+    - Stweak::Ports::Usernames#include?
 coverage_criteria:
   timeout: false
   process_abort: false

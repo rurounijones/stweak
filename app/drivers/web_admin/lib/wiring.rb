@@ -15,7 +15,10 @@ require_relative '../../../../lib/stweak/adapters/event_store/in_memory'
 require_relative '../../../../lib/stweak/adapters/projection_store/in_memory'
 require_relative '../../../../lib/stweak/adapters/key_store/in_memory'
 require_relative '../../../../lib/stweak/adapters/encryption/aes_gcm'
+require_relative '../../../../lib/stweak/adapters/security/pbkdf2_password_hasher'
 require_relative 'reader'
+
+require_relative '../../../adapters/security/bcrypt_password_hasher'
 
 module WebAdmin
   # The composition root: it reads the adapter selection from the environment
@@ -42,8 +45,23 @@ module WebAdmin
       key_store = build_key_store
       WebAdmin::Reader.new(
         projection_store: build_projection_store(key_store),
-        event_store: build_event_store(key_store)
+        event_store: build_event_store(key_store),
+        password_hasher: build_password_hasher
       )
+    end
+
+    # The password verifier used by the login page. The web admin defaults to
+    # bcrypt, matching the data generator's stored hashes; PBKDF2 is available
+    # for memory-only demonstrations.
+    #
+    # @return [Stweak::Domain::Security::PasswordHasher]
+    sig { returns(Stweak::Domain::Security::PasswordHasher) }
+    def self.build_password_hasher
+      case ENV.fetch('PASSWORD_HASHER', 'bcrypt')
+      when 'bcrypt' then ::App::Adapters::BcryptPasswordHasher.new
+      when 'pbkdf2' then Stweak::Adapters::Security::Pbkdf2PasswordHasher.new
+      else raise UnknownAdapter, "unknown PASSWORD_HASHER #{ENV.fetch('PASSWORD_HASHER')}"
+      end
     end
 
     # The key store, from KEY_STORE.

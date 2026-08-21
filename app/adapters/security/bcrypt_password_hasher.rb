@@ -26,6 +26,19 @@ module App
         # plaintext candidate against the hash, which the port does not want.
         BCrypt::Password.create(password).to_s
       end
+
+      # Verify a password against a bcrypt digest, returning false for an
+      # invalid or incompatible stored value.
+      #
+      # @param password [String] the raw password
+      # @param digest [String] the bcrypt hash
+      # @return [Boolean]
+      sig { override.params(password: String, digest: String).returns(T::Boolean) }
+      def verify(password:, digest:)
+        BCrypt::Password.new(digest) == password
+      rescue BCrypt::Errors::InvalidHash
+        false
+      end
     end
   end
 end
