@@ -20,13 +20,21 @@ module Stweak
 
         interface!
 
-        # Digest a password into a self-describing string that a future verify
-        # can be added to without changing what is stored.
+        # Digest a password into a self-describing string.
         #
         # @param password [String]
         # @return [String]
         sig { abstract.params(password: String).returns(String) }
         def digest(password:); end
+
+        # Whether a raw password matches a stored digest. Invalid or unknown
+        # digest formats return false rather than raising a caller-facing error.
+        #
+        # @param password [String]
+        # @param digest [String]
+        # @return [Boolean]
+        sig { abstract.params(password: String, digest: String).returns(T::Boolean) }
+        def verify(password:, digest:); end
       end
     end
   end

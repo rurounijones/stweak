@@ -4,8 +4,8 @@
 require_relative '../../../../lib/stweak/domain/security/password_hasher'
 require_relative '../../../../lib/stweak/adapters/security/pbkdf2_password_hasher'
 RSpec.describe Stweak::Domain::Security::PasswordHasher do
-  it 'declares the digest method implementors must provide' do
-    expect(described_class.instance_methods).to include(:digest)
+  it 'declares the digest and verify methods implementors must provide' do
+    expect(described_class.instance_methods).to include(:digest, :verify)
   end
 
   it 'is implemented by the PBKDF2 hasher' do

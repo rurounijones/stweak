@@ -10,6 +10,7 @@ source 'https://rubygems.org'
 gem 'stweak', path: '../../..'
 
 gem 'aws-sdk-dynamodb', require: false
+gem 'bcrypt', require: false
 gem 'dotenv', require: false
 gem 'puma', require: false
 gem 'rackup', require: false

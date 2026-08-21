@@ -43,6 +43,50 @@ RSpec.describe Stweak::Adapters::Security::Pbkdf2PasswordHasher do
     expect(Base64.strict_decode64(digest)).to eq(expected)
   end
 
+  it 'verifies the correct password' do
+    digest = hasher.digest(password: 'hunter2')
+
+    expect(hasher.verify(password: 'hunter2', digest: digest)).to be(true)
+  end
+
+  it 'rejects the wrong password' do
+    digest = hasher.digest(password: 'hunter2')
+
+    expect(hasher.verify(password: 'wrong', digest: digest)).to be(false)
+  end
+
+  it 'rejects malformed and incompatible digests' do
+    aggregate_failures do
+      expect(hasher.verify(password: 'hunter2', digest: 'not-a-digest')).to be(false)
+      expect(hasher.verify(password: 'hunter2', digest: 'bcrypt$1$salt$hash')).to be(false)
+      expect(hasher.verify(password: 'hunter2', digest: 'pbkdf2-sha256$nope$c2FsdA==$aGFzaA==')).to be(false)
+    end
+  end
+
+  it 'rejects a non-positive iteration count' do
+    salt = Base64.strict_encode64('0123456789abcdef')
+    digest = Base64.strict_encode64('x' * 32)
+
+    expect(hasher.verify(password: 'hunter2', digest: "pbkdf2-sha256$0$#{salt}$#{digest}")).to be(false)
+  end
+
+  it 'rejects a stored digest that is not 32 bytes' do
+    salt = Base64.strict_encode64('0123456789abcdef')
+    short = Base64.strict_encode64('too-short')
+
+    expect(hasher.verify(password: 'hunter2', digest: "pbkdf2-sha256$1000$#{salt}$#{short}")).to be(false)
+  end
+
+  it 'rejects invalid base64' do
+    expect(hasher.verify(password: 'hunter2', digest: 'pbkdf2-sha256$1000$%%%$%%%')).to be(false)
+  end
+
+  it 'verifies a digest produced by another instance' do
+    digest = described_class.new(iterations: 1_000).digest(password: 'hunter2')
+
+    expect(hasher.verify(password: 'hunter2', digest: digest)).to be(true)
+  end
+
   it 'produces a self-describing digest for any password', :property do
     PropCheck.forall(string) do |password|
       expect(hasher.digest(password: password))
