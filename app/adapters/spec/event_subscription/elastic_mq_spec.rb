@@ -91,6 +91,28 @@ RSpec.describe App::Adapters::ElasticMqSubscription do
     expect(listener.deliveries).to include([event])
   end
 
+  it 'drains delivered messages and stops the poller' do
+    listener = QueuedListener.new.tap { |l| subscription.register(listener: l) }
+    subscription.publish(events: [event])
+    subscription.drain
+    expect(listener.deliveries).to include([event])
+  end
+
+  # A message that cannot be processed must not hang the caller: its delete
+  # never runs, so the processed count never catches the published count, and
+  # drain returns at its timeout rather than waiting forever.
+  context 'when a message cannot be processed' do
+    before { allow(sqs).to receive(:delete_message).and_raise('cannot delete') }
+
+    it 'stops draining at the timeout' do
+      subscription.register(listener: QueuedListener.new)
+      subscription.publish(events: [event])
+      start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      subscription.drain(timeout: 0.05)
+      expect(Process.clock_gettime(Process::CLOCK_MONOTONIC) - start).to be_between(0.05, 5)
+    end
+  end
+
   # The malformed-message case exercises the per-message rescue inside a poll;
   # this drives the loop's own rescue, where the queue read itself fails: a
   # transient error must not kill the poller.
