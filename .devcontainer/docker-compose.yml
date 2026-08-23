@@ -57,13 +57,35 @@ services:
 
   redis:
     image: redis:7-alpine
+    # Published on 6381 to avoid clashing with other Redis containers a host may
+    # already run on 6379; inside the compose network it is still reached as
+    # redis:6379, so the dev container and specs are unaffected.
     ports:
-      - '6379:6379'
+      - '6381:6379'
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # OpenObserve receives the drivers' OpenTelemetry traces. It is not needed by
+  # the specs or the app-area adapters; only the drivers export to it, and only
+  # when their .env names its endpoint, so it is off the default test path.
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:latest
+    container_name: openobserve
+    ports:
+      - "5080:5080"
+    volumes:
+      - /tmp/openobserve_data:/data
+    environment:
+      - ZO_ROOT_USER_EMAIL=root@example.com
+      - ZO_ROOT_USER_PASSWORD=Root123!
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:5080/ || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   stweak-bundle:
