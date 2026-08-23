@@ -46,44 +46,65 @@ module DataGenerator
     # Raised when a selector names an adapter that does not exist.
     class UnknownAdapter < StandardError; end
 
+    # The assembled system a caller drives: the generator, plus the
+    # subscription so a short-lived caller can drain the read side before it
+    # exits. Delivery to the projections is asynchronous through the
+    # subscription's transport, so without draining a run can exit with events
+    # still unconsumed — their projection work never done and, with tracing on,
+    # their spans never recorded.
+    class Built < T::Struct
+      const :generator, DataGenerator::Generator
+      const :subscription, Stweak::Ports::EventSubscription
+    end
+
     # Build the generator over the selected adapters. The one key store is
     # shared by every encrypting decorator — event store, projection store and
     # checkpoint store alike — so a single key decrypts a person's data
-    # everywhere, and one shred erases it everywhere.
+    # everywhere, and one shred erases it everywhere. Returns the generator
+    # paired with the subscription so the caller can drain the read side.
     #
-    # @return [DataGenerator::Generator]
-    sig { returns(DataGenerator::Generator) }
+    # @return [DataGenerator::Wiring::Built]
+    sig { returns(Built) }
     def self.build
       key_store = build_key_store
       subscription = build_subscription
       event_store = build_event_store(key_store, subscription)
-      projection_store = build_projection_store(key_store)
+      raw_projection = raw_projection_store
+      projection_store = build_projection_store(key_store, raw_projection)
       register_projection(event_store, projection_store, subscription)
-      handler = build_handler(event_store, projection_store, key_store)
-      DataGenerator::Generator.new(handler: handler, event_store: event_store)
+      handler = build_handler(event_store, raw_projection, key_store)
+      generator = DataGenerator::Generator.new(handler: handler, event_store: event_store)
+      Built.new(generator: generator, subscription: subscription)
     end
 
     # The write-side command handler: it hashes through bcrypt, checkpoints to
     # the selected checkpoint store, and enforces username uniqueness against
-    # the usernames read model over the projection store.
+    # the usernames read model. That check reads the raw, undecorated projection
+    # store rather than the encrypting decorator: the username is a non-PII
+    # column, so reading it directly answers the uniqueness question without
+    # decrypting every account's name and email — the wasted work, and the key
+    # fetch per row, that decrypting the whole table for one plaintext column
+    # would cost.
     #
     # @param event_store [Stweak::Ports::EventStore]
-    # @param projection_store [Stweak::Ports::ProjectionStore]
+    # @param raw_projection_store [Stweak::Ports::ProjectionStore] the
+    #   undecorated store the accounts projector writes behind its encrypting
+    #   decorator; shared so the username read sees the same rows
     # @param key_store [Stweak::Ports::KeyStore]
     # @return [Stweak::Domain::Accounts::CreateAccountHandler]
     sig do
       params(
         event_store: Stweak::Ports::EventStore,
-        projection_store: Stweak::Ports::ProjectionStore,
+        raw_projection_store: Stweak::Ports::ProjectionStore,
         key_store: Stweak::Ports::KeyStore
       ).returns(Stweak::Domain::Accounts::CreateAccountHandler)
     end
-    def self.build_handler(event_store, projection_store, key_store)
+    def self.build_handler(event_store, raw_projection_store, key_store)
       Stweak::Domain::Accounts::CreateAccountHandler.new(
         event_store: event_store,
         password_hasher: App::Adapters::BcryptPasswordHasher.new,
         checkpoint_store: build_checkpoint_store(key_store),
-        usernames: App::Adapters::Projection::Usernames.new(store: projection_store)
+        usernames: App::Adapters::Projection::Usernames.new(store: raw_projection_store)
       )
     end
 
@@ -154,14 +175,21 @@ module DataGenerator
     end
 
     # The projection store, behind the encrypting decorator so display names
-    # and emails are encrypted at the store boundary.
+    # and emails are encrypted at the store boundary. The undecorated store is
+    # passed in rather than built here, so the same instance backs both the
+    # decorator the projector writes through and the raw read the username
+    # uniqueness check uses.
     #
     # @param key_store [Stweak::Ports::KeyStore]
+    # @param store [Stweak::Ports::ProjectionStore] the undecorated store to wrap
     # @return [Stweak::Ports::ProjectionStore]
-    sig { params(key_store: Stweak::Ports::KeyStore).returns(Stweak::Ports::ProjectionStore) }
-    def self.build_projection_store(key_store)
+    sig do
+      params(key_store: Stweak::Ports::KeyStore, store: Stweak::Ports::ProjectionStore)
+        .returns(Stweak::Ports::ProjectionStore)
+    end
+    def self.build_projection_store(key_store, store)
       App::Adapters::ProjectionStore::EncryptingProjectionStore.new(
-        store: raw_projection_store,
+        store: store,
         cipher: Stweak::Adapters::Encryption::AesGcm.new,
         key_store: key_store
       )

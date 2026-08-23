@@ -7,7 +7,7 @@ require_relative '../lib/data_generator'
 require_relative '../lib/wiring'
 
 RSpec.describe DataGenerator::Generator do
-  subject(:generator) { DataGenerator::Wiring.build }
+  subject(:generator) { DataGenerator::Wiring.build.generator }
 
   around do |example|
     saved = ENV.to_hash

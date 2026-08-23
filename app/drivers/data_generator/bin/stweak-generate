@@ -9,8 +9,66 @@
 require 'dotenv'
 Dotenv.load(File.expand_path('../../.env', __dir__))
 
+# Enable OpenTelemetry tracing only when an OTLP endpoint is configured (in the
+# shared .env). Unset means no exporter and no connection attempts, so the
+# generator runs identically with tracing off. use_all auto-instruments the AWS
+# SDK (DynamoDB, SQS) and Redis; the generator also emits its own span per
+# command (see Generator#run).
+tracing = !ENV.fetch('OTEL_EXPORTER_OTLP_ENDPOINT', '').empty?
+if tracing
+  require 'opentelemetry/sdk'
+  require 'opentelemetry/exporter/otlp'
+  require 'opentelemetry/instrumentation/all'
+  # Load redis before configure so use_all's Redis instrumentation detects
+  # RedisClient (redis 5+ does its I/O through it) and registers its middleware;
+  # loaded later, in the wiring, it would install after use_all has run and the
+  # key- and checkpoint-store calls would go untraced. Same ordering the Sinatra
+  # note in web_admin's config.ru relies on.
+  require 'redis'
+  # Register app instrumentation before use_all, so it installs alongside the
+  # off-the-shelf libraries (SQLite has no published gem of its own).
+  require_relative '../../../adapters/observability/sqlite_instrumentation'
+  require_relative '../../../observability/domain'
+  require_relative '../../../observability/adapters'
+  OpenTelemetry::SDK.configure do |c|
+    c.service_name = 'stweak-data-generator'
+    c.use_all
+  end
+  # On recent aws-sdk-core the instrumentation defers to the SDK's own telemetry
+  # plugin, which stays a no-op until a provider is set. Point it at
+  # OpenTelemetry so the DynamoDB and SQS client spans are emitted, nesting
+  # under the named adapter spans below. Clients built by the wiring inherit it.
+  Aws.config[:telemetry_provider] = Aws::Telemetry::OTelProvider.new
+  App::Observability::Domain.install
+  App::Observability::Adapters.install
+end
+
 require_relative '../lib/wiring'
 
 count = Integer(ARGV.fetch(0, '100'))
-accounts = DataGenerator::Wiring.build.run(count)
+
+# Wiring constructs the stores, which create their DynamoDB tables and SQS queue
+# on first use. Those setup calls happen before any command span, so wrap them
+# in one span to keep them from surfacing as orphaned client spans.
+build = -> { DataGenerator::Wiring.build }
+built =
+  if tracing
+    OpenTelemetry.tracer_provider
+                 .tracer('stweak-data-generator')
+                 .in_span('data_generator.boot', attributes: { 'code.function' => 'main#build' }) { build.call }
+  else
+    build.call
+  end
+accounts = built.generator.run(count)
 puts "Created #{accounts.length} accounts"
+
+# The subscription delivers to the projections asynchronously through its
+# transport, so this short-lived process would otherwise exit with the tail-end
+# events still unconsumed — their projection work never done and, with tracing
+# on, their spans never recorded. Drain so the read side catches up first. The
+# in-memory subscription delivers synchronously and has nothing to drain.
+built.subscription.drain if built.subscription.respond_to?(:drain)
+
+# Flush the batch span processor before this short-lived process exits, so the
+# last spans are not dropped.
+OpenTelemetry.tracer_provider.shutdown if tracing

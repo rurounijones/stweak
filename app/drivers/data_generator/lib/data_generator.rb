@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require 'faker'
+require 'opentelemetry'
 require 'securerandom'
 require 'sorbet-runtime'
 require 'stweak'
@@ -27,6 +28,12 @@ module DataGenerator
     def initialize(handler:, event_store:)
       @handler = handler
       @event_store = event_store
+      # A no-op tracer unless an SDK has been configured at boot (see
+      # bin/stweak-generate), so the spans below cost nothing with tracing off.
+      @tracer = T.let(
+        OpenTelemetry.tracer_provider.tracer('stweak-data-generator'),
+        OpenTelemetry::Trace::Tracer
+      )
     end
 
     # Create count accounts with random usernames and display names.
@@ -35,7 +42,16 @@ module DataGenerator
     # @return [Array<Stweak::Domain::Accounts::Account>] the created accounts
     sig { params(count: Integer).returns(T::Array[Stweak::Domain::Accounts::Account]) }
     def run(count)
-      Array.new(count) { @handler.handle(random_command) }
+      Array.new(count) do
+        @tracer.in_span(
+          'data_generator.create_account',
+          attributes: { 'code.function' => 'DataGenerator::Generator#run' }
+        ) do |span|
+          @handler.handle(random_command).tap do |account|
+            span.set_attribute('stweak.account_id', account.id.value)
+          end
+        end
+      end
     end
 
     # Every event written by the generator, for verifying the run.
