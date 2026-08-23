@@ -76,6 +76,55 @@ Start it (defaults to the real adapters on port 4567):
 It has data to show only after the data generator has run against the same
 stores.
 
+### Tracing the drivers
+
+The compose stack includes OpenObserve, which receives OpenTelemetry traces
+from the two drivers. Its UI is at <http://localhost:5080> (log in with
+`root@example.com` / `Root123!`). Tracing is off by default and touches only the
+drivers, never the specs or the app-area adapters.
+
+To turn it on, uncomment the three `OTEL_*` lines in the shared
+`app/drivers/.env` (see `.env.example`); an unset `OTEL_EXPORTER_OTLP_ENDPOINT`
+disables tracing entirely, so a plain run and the test suites never export. Each
+driver auto-instruments its libraries through `opentelemetry-instrumentation-all`,
+so spans appear for the Sinatra routes (web admin), the AWS SDK calls (the
+DynamoDB event store and the SQS subscription), and Redis (the key and
+checkpoint stores). SQLite has no published instrumentation gem, so the app
+carries its own (`app/adapters/observability/sqlite_instrumentation.rb`),
+registered the same way and installed by the same `use_all`; projection-store
+queries therefore appear as client spans too. Application-side wrappers in
+`app/observability/domain.rb` prepend spans onto the domain handler, aggregate,
+and projection system without adding telemetry dependencies to `lib/`. The
+useful domain spans include `domain.account.create`,
+`domain.account.apply_create`, `domain.aggregate.replay`, and
+`domain.projection.on_events_appended`; they nest beneath the driver operation
+that invoked them.
+
+Parallel wrappers in `app/observability/adapters.rb` do the same for the
+app-area adapters, so each AWS SDK client call has a semantically-named parent
+instead of surfacing as a bare `dynamodb-local POST` or SQS `POST`. The event
+store gains `eventstore.append`, `eventstore.read_stream`,
+`eventstore.each_stream`, and the boot-time `eventstore.list_tables` and
+`eventstore.ensure_tables`; the subscription gains `subscription.publish` and
+the boot-time `subscription.ensure_queue`. The subscription's poller-thread
+spans (`event_subscription.poll` and `event_subscription.deliver`) stay inline
+in the adapter, because their cross-thread trace-context propagation cannot be
+added from outside. The data generator adds one span of its own per account it
+creates, which becomes the parent of the domain and store spans that account
+produced. Projection row writes and cursor advances share one SQLite
+transaction, so their SQL spans appear between one `BEGIN` and `COMMIT`.
+Because the projection is fed asynchronously through the subscription's queue,
+the generator drains it before exiting, so every account's `deliver` and
+projection spans are recorded rather than lost when the short-lived process
+ends mid-delivery.
+
+The wrappers attach only operation metadata (class names, identifiers, counts,
+and projection names); names, email addresses, and passwords are never added to
+spans.
+
+With tracing enabled, run the generator and then open OpenObserve → Traces and
+select the service `stweak-data-generator` or `stweak-web-admin`.
+
 ## The checks
 
 ### Everything at once
