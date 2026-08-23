@@ -15,8 +15,21 @@ gem 'dotenv', require: false
 gem 'puma', require: false
 gem 'rackup', require: false
 gem 'redis', require: false
+# aws-sdk-core selects an XML parser when the AwsSdk instrumentation loads it at
+# boot, and rexml stopped being a Ruby default gem, so one must be declared for
+# the SDK to find. aws-sdk-core requires it itself, hence require: false.
+gem 'rexml', require: false
 gem 'sinatra', require: false
 gem 'sqlite3', require: false
+
+# Observability, wired only at boot when tracing is enabled (see config.ru).
+gem 'opentelemetry-api', require: false
+gem 'opentelemetry-exporter-otlp', require: false
+gem 'opentelemetry-instrumentation-all', require: false
+# Pulled in transitively, but named explicitly because the app's own SQLite
+# instrumentation subclasses OpenTelemetry::Instrumentation::Base from it.
+gem 'opentelemetry-instrumentation-base', require: false
+gem 'opentelemetry-sdk', require: false
 
 group :development, :test do
   gem 'rack-test', '~> 2.1', require: false
