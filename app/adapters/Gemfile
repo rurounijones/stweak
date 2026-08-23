@@ -13,6 +13,11 @@ gem 'bcrypt', require: false
 gem 'redis', require: false
 gem 'sqlite3', require: false
 
+# The subscription propagates trace context through the queue so a consumer's
+# spans link to the producer's. Only the API is needed — emitting and
+# propagating spans — and it is a no-op unless a driver configures the SDK.
+gem 'opentelemetry-api', require: false
+
 group :development, :test do
   gem 'rspec', '~> 3.13', require: false
   gem 'simplecov', '~> 0.22', require: false
