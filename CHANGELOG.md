@@ -20,6 +20,17 @@ adheres to [Semantic Versioning][semver].
   and the in-memory and crypto adapters that implement them (`InMemoryEventStore`,
   `EncryptingEventStore`, `InMemoryKeyStore`, `Pbkdf2PasswordHasher`,
   `AesGcm`).
+- OpenTelemetry tracing wired into the two drivers, off by default: an unset
+  `OTEL_EXPORTER_OTLP_ENDPOINT` disables export, so plain runs and the specs
+  emit nothing. OpenObserve added to the compose stack to receive the traces,
+  with `bin/` helpers to start it and generate a trace run, and DEVELOP.md
+  documents turning it on.
+- Tracing spans for the domain and the app-area adapters, added entirely from
+  outside the domain: Ruby modules prepended onto `Account`,
+  `CreateAccountHandler`, `Aggregate`, the projection system, and every store,
+  subscription and hasher, so no file under `lib/` is touched and the domain
+  gem gains no telemetry dependency. A small SQLite instrumentation covers the
+  one library with no published gem.
 
 [keepachangelog]: https://keepachangelog.com/en/1.1.0/
 [semver]: https://semver.org/spec/v2.0.0.html
