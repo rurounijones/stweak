@@ -1,0 +1,6 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+abort 'Failed to start OpenObserve' unless system(
+  'docker', 'compose', '-f', '.devcontainer/docker-compose.yml', 'up', '-d', 'openobserve'
+)

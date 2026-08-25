@@ -30,58 +30,85 @@ module DataGenerator
   class Wiring
     extend T::Sig
 
+    # The assembled system a caller drives: the generator, plus the subscription
+    # so a short-lived caller can drain the read side before it exits. Delivery
+    # to the projections is asynchronous through the subscription's queue, so
+    # without draining a run can exit with events still unconsumed.
+    class Built < T::Struct
+      const :generator, DataGenerator::Generator
+      const :subscription, App::Adapters::ElasticMqSubscription
+    end
+
     # Build the wiring.
     #
     # @param database_path [String] the SQLite file for the projection store
     # @param streams_table [String] the DynamoDB streams table name
     # @param queue_name [String] the ElasticMQ queue name
-    # @return [DataGenerator::Generator]
+    # @return [DataGenerator::Wiring::Built]
+    # rubocop:disable Metrics/MethodLength -- one composition step: the read
+    # side, the handler over it, and the pair the caller drives and drains.
     sig do
       params(
         database_path: String,
         streams_table: String,
         queue_name: String
-      ).returns(DataGenerator::Generator)
+      ).returns(Built)
     end
     def self.build(database_path:, streams_table:, queue_name:)
-      event_store, usernames = build_read_side(database_path:, streams_table:, queue_name:)
+      event_store, usernames, subscription = build_read_side(database_path:, streams_table:, queue_name:)
       handler = Stweak::Domain::Accounts::CreateAccountHandler.new(
         event_store: event_store,
         password_hasher: App::Adapters::BcryptPasswordHasher.new,
         checkpoint_store: encrypted_checkpoint_store,
         usernames: usernames
       )
-      DataGenerator::Generator.new(handler: handler, event_store: event_store)
+      Built.new(
+        generator: DataGenerator::Generator.new(handler: handler, event_store: event_store),
+        subscription: subscription
+      )
     end
+    # rubocop:enable Metrics/MethodLength
 
     # The read side: the event store (DynamoDB behind the encrypting store,
     # keys in Redis) publishing through the subscription, and the accounts
     # projector fed by a projection system into the SQLite projection store
     # behind the encrypting decorator (Redis keys). Returns the store and the
-    # usernames read so the write side can share them.
+    # usernames read so the write side can share them, and the subscription so
+    # the caller can drain it.
     #
     # @param database_path [String] the SQLite file for the projection store
     # @param streams_table [String] the DynamoDB streams table name
     # @param queue_name [String] the ElasticMQ queue name
-    # @return [Array(Stweak::Ports::EventStore, Stweak::Ports::Usernames)]
+    # @return [Array(Stweak::Ports::EventStore, Stweak::Ports::Usernames, App::Adapters::ElasticMqSubscription)]
     sig do
       params(
         database_path: String,
         streams_table: String,
         queue_name: String
-      ).returns([Stweak::Ports::EventStore, Stweak::Ports::Usernames])
+      ).returns([Stweak::Ports::EventStore, Stweak::Ports::Usernames, App::Adapters::ElasticMqSubscription])
     end
     def self.build_read_side(database_path:, streams_table:, queue_name:)
       key_store = App::Adapters::RedisKeyStore.new(redis: redis)
-      projection_store = encrypted_projection_store(key_store, database_path)
+      raw_projection_store = App::Adapters::SqliteProjectionStore.new(
+        db: SQLite3::Database.new(database_path)
+      )
+      projection_store = encrypted_projection_store(key_store, raw_projection_store)
       subscription = App::Adapters::ElasticMqSubscription.new(sqs: sqs, queue_name: queue_name)
       event_store = encrypting_store(key_store, subscription, streams_table)
       projection_system = Stweak::Domain::ProjectionSystem.new(
         event_store: event_store, projection_store: projection_store, subscription: subscription
       )
-      projection_system.register(App::Adapters::Projection::AccountsProjector.new(store: projection_store))
-      usernames = App::Adapters::Projection::Usernames.new(store: projection_store)
-      [event_store, usernames]
+      projection = App::Adapters::Projection::AccountsProjector.new(store: projection_store)
+      projection_system.register_with(
+        projection,
+        stream_reader: event_store.method(:each_encrypted_stream),
+        event_applier: projection.method(:apply_encrypted)
+      )
+      # Username uniqueness only needs the non-PII username column. Reading it
+      # through the encrypting decorator would decrypt every account row and
+      # issue one Redis key lookup per row on every create.
+      usernames = App::Adapters::Projection::Usernames.new(store: raw_projection_store)
+      [event_store, usernames, subscription]
     end
 
     # The encrypting projection store: the SQLite store behind the encrypting
@@ -89,15 +116,15 @@ module DataGenerator
     # boundary.
     #
     # @param key_store [Stweak::Ports::KeyStore]
-    # @param database_path [String]
+    # @param store [Stweak::Ports::ProjectionStore]
     # @return [Stweak::Ports::ProjectionStore]
     sig do
-      params(key_store: Stweak::Ports::KeyStore, database_path: String)
+      params(key_store: Stweak::Ports::KeyStore, store: Stweak::Ports::ProjectionStore)
         .returns(Stweak::Ports::ProjectionStore)
     end
-    def self.encrypted_projection_store(key_store, database_path)
+    def self.encrypted_projection_store(key_store, store)
       App::Adapters::ProjectionStore::EncryptingProjectionStore.new(
-        store: App::Adapters::SqliteProjectionStore.new(db: SQLite3::Database.new(database_path)),
+        store: store,
         cipher: Stweak::Adapters::Encryption::AesGcm.new,
         key_store: key_store
       )

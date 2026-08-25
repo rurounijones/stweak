@@ -10,10 +10,26 @@ gem 'stweak', path: '../../..'
 
 gem 'aws-sdk-dynamodb', require: false
 gem 'aws-sdk-sqs', require: false
+# aws-sdk-core needs an XML parser to read the SQS query-protocol responses,
+# and rexml stopped being a Ruby default gem, so it must be declared for the
+# SDK to find one. aws-sdk-core requires it itself, hence require: false.
+gem 'rexml', require: false
 gem 'bcrypt', require: false
+gem 'dotenv', require: false
 gem 'faker', require: false
 gem 'redis', require: false
 gem 'sqlite3', require: false
+
+# Observability. The API is always loaded so the generator can emit a span per
+# command; the SDK and instrumentation are wired only at boot when tracing is
+# enabled (see bin/stweak-generate), and without them the spans are no-ops.
+gem 'opentelemetry-api', require: false
+gem 'opentelemetry-exporter-otlp', require: false
+gem 'opentelemetry-instrumentation-all', require: false
+# Pulled in transitively, but named explicitly because the app's own SQLite
+# instrumentation subclasses OpenTelemetry::Instrumentation::Base from it.
+gem 'opentelemetry-instrumentation-base', require: false
+gem 'opentelemetry-sdk', require: false
 
 group :development, :test do
   gem 'rspec', '~> 3.13', require: false
