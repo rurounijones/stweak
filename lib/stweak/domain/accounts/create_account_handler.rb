@@ -78,8 +78,9 @@ module Stweak
         # carries unchanged. The account stores the username of the command
         # that created it, so a match means the command has already been
         # applied and its result can be returned. An account that was never
-        # created has an empty username, which no valid command carries, so the
-        # match alone distinguishes a retry from a fresh create.
+        # created has ValueMissing for a username, which is equal to no
+        # Username, so the match alone distinguishes a retry from a fresh
+        # create.
         #
         # @param account [Account]
         # @param command [CreateAccount]
@@ -133,9 +134,9 @@ module Stweak
         # log; the rule spans aggregates, so no single aggregate can enforce it
         # itself.
         #
-        # @param username [String]
+        # @param username [Username]
         # @raise [UsernameTaken] if the username is already in use
-        sig { params(username: String).void }
+        sig { params(username: Username).void }
         def ensure_username_available(username)
           return unless @usernames.include?(username)
 

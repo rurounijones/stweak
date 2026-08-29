@@ -218,6 +218,28 @@ confusion a bare string would hide. The cost is more types and more ceremony,
 which is the same trade the project already makes for static typing, and it is
 accepted for the same reason: the check happens before the code runs.
 
+The Account's own meaning-bearing strings are named for the same reason its id
+is. A `Username`, an `Email` and a `DisplayName` are each a value object rather
+than a bare `String`, threaded through `CreateAccount`, `AccountCreated` and the
+aggregate, so a method that wants an email cannot be handed a display name, and
+each type validates itself at construction — the non-emptiness rule lives on the
+type, not as a guard repeated in every command and event. The value objects
+collapse to their plain strings at every serialization boundary and are rebuilt
+on the way back, so nothing but the domain ever sees the wrapper.
+
+Each is a standalone class, with no shared `StringValue` base, and that is a
+deliberate reversal of the obvious design. A shared base was tried and rejected:
+with nothing to distinguish one subclass from another, the base's `is_a?` and
+`instance_of?` checks and its identity comparisons became equivalent mutants —
+mutations mutant could not kill because they changed no observable behaviour.
+The standalone form has no such seam. Where a
+stored value is read back it is narrowed with a `case … when String`, which both
+tells Sorbet the type and is a branch mutant can flip; where a value is written
+out each type answers a polymorphic `to_stored` — the `ValueMissing` marker
+answers it too — so there is no type check to be made equivalent. The shared
+base read as less ceremony and cost a hole in the mutation score; the standalone
+classes are a little more code and leave nothing alive.
+
 ## Errors are part of the contract
 
 An API's errors are part of its contract, named and documented like its return

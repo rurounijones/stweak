@@ -6,6 +6,9 @@ require_relative '../aggregate'
 require_relative '../error'
 require_relative '../value_missing'
 require_relative 'account_created'
+require_relative 'display_name'
+require_relative 'email'
+require_relative 'username'
 
 module Stweak
   module Domain
@@ -44,16 +47,16 @@ module Stweak
         sig { returns(T::Boolean) }
         attr_reader :created
 
-        sig { returns(String) }
+        sig { returns(T.any(Username, T.class_of(ValueMissing))) }
         attr_reader :username
 
         sig { returns(String) }
         attr_reader :password_hash
 
-        sig { returns(T.any(String, T.class_of(ValueMissing))) }
+        sig { returns(T.any(DisplayName, T.class_of(ValueMissing))) }
         attr_reader :name
 
-        sig { returns(T.any(String, T.class_of(ValueMissing))) }
+        sig { returns(T.any(Email, T.class_of(ValueMissing))) }
         attr_reader :email
 
         # @param id [AccountId] the account id, also its stream id
@@ -61,26 +64,30 @@ module Stweak
         def initialize(id:)
           super
           @created = T.let(false, T::Boolean)
-          @username = T.let('', String)
           @password_hash = T.let('', String)
+          # An account that has not been created yet has no username, name or
+          # email. The absence is ValueMissing rather than nil or an empty
+          # string: an observable, non-nil sentinel that a mutation cannot
+          # quietly stand in for, and the same marker a shredded field reads as.
           # Declared untyped rather than the precise union type: a `T.let` type
           # annotation has no runtime behaviour for mutation testing to pin.
           # The readers above expose the precise type.
-          @name = T.let('', T.untyped)
-          @email = T.let('', T.untyped)
+          @username = T.let(ValueMissing, T.untyped)
+          @name = T.let(ValueMissing, T.untyped)
+          @email = T.let(ValueMissing, T.untyped)
         end
 
         # Create the account, emitting an AccountCreated event. The password
         # arriving here is already a hash.
         #
-        # @param username [String]
+        # @param username [Username]
         # @param password_hash [String]
-        # @param name [String]
-        # @param email [String]
+        # @param name [DisplayName]
+        # @param email [Email]
         # @param occurred_at [Time]
         # @raise [AccountAlreadyExists] if the account has already been created
         sig do
-          params(username: String, password_hash: String, name: String, email: String, occurred_at: Time).void
+          params(username: Username, password_hash: String, name: DisplayName, email: Email, occurred_at: Time).void
         end
         def create(username:, password_hash:, name:, email:, occurred_at:)
           raise AccountAlreadyExists, "account #{id} already exists" if created
@@ -121,8 +128,8 @@ module Stweak
         sig { override.returns(T::Hash[String, T.untyped]) }
         def checkpoint_state
           {
-            'created' => @created, 'username' => @username, 'password_hash' => @password_hash,
-            'name' => @name, 'email' => @email
+            'created' => @created, 'username' => @username.to_s, 'password_hash' => @password_hash,
+            'name' => @name.to_stored, 'email' => @email.to_stored
           }
         end
 
@@ -144,12 +151,40 @@ module Stweak
         #   checkpoint
         sig { override.params(state: T::Hash[String, T.untyped]).void }
         def restore(state)
+          name = state.fetch('name')
+          email = state.fetch('email')
           @created = state.fetch('created')
-          @username = state.fetch('username')
+          @username = Username.new(value: state.fetch('username'))
           @password_hash = state.fetch('password_hash')
-          @name = state.fetch('name')
-          @email = state.fetch('email')
+          @name = wrap_pii(name) { |string| DisplayName.new(value: string) }
+          @email = wrap_pii(email) { |string| Email.new(value: string) }
         end
+
+        private
+
+        # Re-wrap a restored PII field. A serialized value is a string, which the
+        # block turns into its value object; the ValueMissing marker of a
+        # shredded field is not a string and passes through unchanged. The type
+        # test is what tells the two apart — the marker is the only non-string a
+        # restored field can hold.
+        #
+        # @param value [Object] the serialized field: a string or the marker
+        # @yieldparam string [String] the serialized value, when it is a string
+        # @yieldreturn [Object] the value object built from it
+        # @return [Object] the value object, or the marker unchanged
+        #
+        # rubocop:disable Naming/BlockForwarding -- srb tc does not recognise
+        # anonymous `&`; the named block parameter is required to match the sig.
+        sig do
+          params(value: T.untyped, blk: T.proc.params(arg0: String).returns(T.untyped)).returns(T.untyped)
+        end
+        def wrap_pii(value, &blk)
+          case value
+          when String then yield(value)
+          else value
+          end
+        end
+        # rubocop:enable Naming/BlockForwarding
       end
     end
   end

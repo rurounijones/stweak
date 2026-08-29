@@ -3,6 +3,29 @@
 
 require_relative '../../../../lib/stweak/domain/accounts/account'
 require_relative '../../../../lib/stweak/domain/accounts/account_created'
+
+# Concise builders for the account value objects, to keep examples short.
+def make_username(value) = Stweak::Domain::Accounts::Username.new(value: value)
+def make_display_name(value) = Stweak::Domain::Accounts::DisplayName.new(value: value)
+def make_email(value) = Stweak::Domain::Accounts::Email.new(value: value)
+
+# The time every example in this file creates accounts at.
+CREATED_AT = Time.utc(2026, 1, 2, 3, 4, 5)
+
+# Create an account with the given fields, defaulting to Alice's.
+def create_account_on(target, username: 'alice', password_hash: 'hash', name: 'Alice', email: 'alice@example.com')
+  target.create(username: make_username(username), password_hash: password_hash, name: make_display_name(name),
+                email: make_email(email), occurred_at: CREATED_AT)
+end
+
+# Restore a checkpoint of Alice's account, overriding the shred-sensitive
+# fields and the created flag as a test needs.
+def restore_alice(target, name: 'Alice', email: 'alice@example.com', created: true)
+  target.restore(
+    'created' => created, 'username' => 'alice', 'password_hash' => 'hash', 'name' => name, 'email' => email
+  )
+end
+
 # A non-AccountCreated event, to exercise the unknown-event branch of apply.
 class OtherAccountEvent < Stweak::Domain::Event
   VERSION = 1
@@ -22,8 +45,8 @@ end
 def build_created_event(account_id, occurred_at, sequence)
   Stweak::Domain::Accounts::AccountCreated.new(
     stream_id: account_id, sequence: sequence, occurred_at: occurred_at, account_id: account_id,
-    username: "user-#{sequence}", password_hash: 'hash', name: "Name #{sequence}",
-    email: "user#{sequence}@example.com"
+    username: make_username("user-#{sequence}"), password_hash: 'hash',
+    name: make_display_name("Name #{sequence}"), email: make_email("user#{sequence}@example.com")
   )
 end
 
@@ -60,14 +83,9 @@ RSpec.describe Stweak::Domain::Accounts::Account do
 
   let(:created_event) do
     Stweak::Domain::Accounts::AccountCreated.new(
-      stream_id: account_id,
-      sequence: 1,
-      occurred_at: occurred_at,
-      account_id: account_id,
-      username: 'alice',
-      password_hash: 'hash',
-      name: 'Alice',
-      email: 'alice@example.com'
+      stream_id: account_id, sequence: 1, occurred_at: occurred_at, account_id: account_id,
+      username: make_username('alice'), password_hash: 'hash',
+      name: make_display_name('Alice'), email: make_email('alice@example.com')
     )
   end
 
@@ -76,34 +94,30 @@ RSpec.describe Stweak::Domain::Accounts::Account do
       expect(account.created).to be(false)
     end
 
-    it 'has an empty username' do
-      expect(account.username).to eq('')
+    it 'has no username' do
+      expect(account.username).to be(Stweak::Domain::ValueMissing)
     end
 
     it 'has an empty password hash' do
       expect(account.password_hash).to eq('')
     end
 
-    it 'has an empty name' do
-      expect(account.name).to eq('')
+    it 'has no name' do
+      expect(account.name).to be(Stweak::Domain::ValueMissing)
     end
 
-    it 'has an empty email' do
-      expect(account.email).to eq('')
+    it 'has no email' do
+      expect(account.email).to be(Stweak::Domain::ValueMissing)
     end
   end
 
   describe '#create' do
-    before do
-      account.create(username: 'alice', password_hash: 'hash', name: 'Alice', email: 'alice@example.com',
-                     occurred_at: occurred_at)
-    end
+    before { create_account_on(account) }
 
     it 'numbers created events from the aggregate position' do
       fresh = described_class.new(id: account_id)
       fresh.advance_to(5)
-      fresh.create(username: 'alice', password_hash: 'hash', name: 'Alice', email: 'alice@example.com',
-                   occurred_at: occurred_at)
+      create_account_on(fresh)
       expect(fresh.uncommitted_events.first.sequence).to eq(6)
     end
 
@@ -116,7 +130,7 @@ RSpec.describe Stweak::Domain::Accounts::Account do
     end
 
     it 'exposes the username' do
-      expect(account.username).to eq('alice')
+      expect(account.username).to eq(Stweak::Domain::Accounts::Username.new(value: 'alice'))
     end
 
     it 'exposes the password hash' do
@@ -124,18 +138,16 @@ RSpec.describe Stweak::Domain::Accounts::Account do
     end
 
     it 'exposes the name' do
-      expect(account.name).to eq('Alice')
+      expect(account.name).to eq(Stweak::Domain::Accounts::DisplayName.new(value: 'Alice'))
     end
 
     it 'exposes the email' do
-      expect(account.email).to eq('alice@example.com')
+      expect(account.email).to eq(Stweak::Domain::Accounts::Email.new(value: 'alice@example.com'))
     end
 
     it 'refuses a second create, naming the account' do
-      expect do
-        account.create(username: 'bob', password_hash: 'hash2', name: 'Bob', email: 'bob@example.com',
-                       occurred_at: occurred_at)
-      end.to raise_error(Stweak::Domain::Accounts::AccountAlreadyExists, /#{account_id}.*already exists/)
+      expect { create_account_on(account, username: 'bob', password_hash: 'hash2', name: 'Bob', email: 'b@x.com') }
+        .to raise_error(Stweak::Domain::Accounts::AccountAlreadyExists, /#{account_id}.*already exists/)
     end
   end
 
@@ -147,17 +159,17 @@ RSpec.describe Stweak::Domain::Accounts::Account do
 
     it 'restores the username' do
       rebuilt = described_class.replay(id: account_id, events: [created_event])
-      expect(rebuilt.username).to eq('alice')
+      expect(rebuilt.username).to eq(Stweak::Domain::Accounts::Username.new(value: 'alice'))
     end
 
     it 'restores the name' do
       rebuilt = described_class.replay(id: account_id, events: [created_event])
-      expect(rebuilt.name).to eq('Alice')
+      expect(rebuilt.name).to eq(Stweak::Domain::Accounts::DisplayName.new(value: 'Alice'))
     end
 
     it 'restores the email' do
       rebuilt = described_class.replay(id: account_id, events: [created_event])
-      expect(rebuilt.email).to eq('alice@example.com')
+      expect(rebuilt.email).to eq(Stweak::Domain::Accounts::Email.new(value: 'alice@example.com'))
     end
 
     it 'tracks the expected version' do
@@ -184,18 +196,24 @@ RSpec.describe Stweak::Domain::Accounts::Account do
 
   describe 'checkpointing' do
     it 'restores its state from a checkpoint' do
-      account.restore(
-        'created' => true, 'username' => 'alice', 'password_hash' => 'hash', 'name' => 'Alice',
-        'email' => 'alice@example.com'
-      )
-      expect(state_fields(account)).to eq([true, 'alice', 'Alice', 'alice@example.com', 'hash'])
+      restore_alice(account)
+      expect(state_fields(account)).to eq([true, make_username('alice'), make_display_name('Alice'),
+                                           make_email('alice@example.com'), 'hash'])
+    end
+
+    it 'restores a shredded name and email as the marker, not a value object' do
+      restore_alice(account, name: Stweak::Domain::ValueMissing, email: Stweak::Domain::ValueMissing)
+      expect([account.name, account.email]).to eq([Stweak::Domain::ValueMissing, Stweak::Domain::ValueMissing])
+    end
+
+    it 'checkpoints a shredded name and email as the marker, not a string' do
+      restore_alice(account, name: Stweak::Domain::ValueMissing, email: Stweak::Domain::ValueMissing)
+      expect(account.checkpoint_state.values_at('name', 'email'))
+        .to eq([Stweak::Domain::ValueMissing, Stweak::Domain::ValueMissing])
     end
 
     it 'restores the created flag from its value, not its presence' do
-      account.restore(
-        'created' => false, 'username' => 'alice', 'password_hash' => 'hash', 'name' => 'Alice',
-        'email' => 'alice@example.com'
-      )
+      restore_alice(account, created: false)
       expect(account.created).to be(false)
     end
 

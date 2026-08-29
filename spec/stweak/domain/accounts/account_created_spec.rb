@@ -3,6 +3,12 @@
 
 require_relative '../../../../lib/stweak/domain/accounts/account_created'
 require_relative '../../../../lib/stweak/domain/owner_registry'
+
+# Concise builders for the account value objects, to keep examples short.
+def make_username(value) = Stweak::Domain::Accounts::Username.new(value: value)
+def make_display_name(value) = Stweak::Domain::Accounts::DisplayName.new(value: value)
+def make_email(value) = Stweak::Domain::Accounts::Email.new(value: value)
+
 RSpec.describe Stweak::Domain::Accounts::AccountCreated do
   subject(:event) do
     described_class.new(**valid_attributes)
@@ -17,10 +23,10 @@ RSpec.describe Stweak::Domain::Accounts::AccountCreated do
       sequence: 1,
       occurred_at: occurred_at,
       account_id: account_id,
-      username: 'alice',
+      username: make_username('alice'),
       password_hash: 'hash',
-      name: 'Alice',
-      email: 'alice@example.com'
+      name: make_display_name('Alice'),
+      email: make_email('alice@example.com')
     }
   end
 
@@ -46,10 +52,8 @@ RSpec.describe Stweak::Domain::Accounts::AccountCreated do
   end
 
   it 'is not equal to an event with different fields' do
-    other = described_class.new(
-      stream_id: account_id, sequence: 1, occurred_at: occurred_at,
-      account_id: account_id, username: 'bob', password_hash: 'hash', name: 'Bob', email: 'bob@example.com'
-    )
+    other = described_class.new(**valid_attributes, username: make_username('bob'),
+                                                    name: make_display_name('Bob'), email: make_email('bob@x.com'))
     expect(event == other).to be(false)
   end
 
@@ -136,24 +140,9 @@ RSpec.describe Stweak::Domain::Accounts::AccountCreated do
       .to raise_error(Stweak::Domain::ValidationError, /sequence/)
   end
 
-  it 'rejects an empty username' do
-    expect { described_class.new(**valid_attributes, username: '') }
-      .to raise_error(Stweak::Domain::ValidationError, /username/)
-  end
-
   it 'rejects an empty password hash' do
     expect { described_class.new(**valid_attributes, password_hash: '') }
       .to raise_error(Stweak::Domain::ValidationError, /password hash/)
-  end
-
-  it 'rejects an empty name' do
-    expect { described_class.new(**valid_attributes, name: '') }
-      .to raise_error(Stweak::Domain::ValidationError, /name/)
-  end
-
-  it 'rejects an empty email' do
-    expect { described_class.new(**valid_attributes, email: '') }
-      .to raise_error(Stweak::Domain::ValidationError, /email/)
   end
 
   it 'accepts a name that has been shredded' do
@@ -166,15 +155,31 @@ RSpec.describe Stweak::Domain::Accounts::AccountCreated do
       .to eq(Stweak::Domain::ValueMissing)
   end
 
-  it 'validates a name that is a String subclass as a String' do
-    empty_subclass = Class.new(String).new('')
-    expect { described_class.new(**valid_attributes, name: empty_subclass) }
-      .to raise_error(Stweak::Domain::ValidationError, /name/)
+  it 'serializes a shredded name as the marker, not a string' do
+    serialized = described_class.new(**valid_attributes, name: Stweak::Domain::ValueMissing).to_h
+    expect(serialized['name']).to be(Stweak::Domain::ValueMissing)
   end
 
-  it 'validates an email that is a String subclass as a String' do
-    empty_subclass = Class.new(String).new('')
-    expect { described_class.new(**valid_attributes, email: empty_subclass) }
-      .to raise_error(Stweak::Domain::ValidationError, /email/)
+  it 'serializes a shredded email as the marker, not a string' do
+    serialized = described_class.new(**valid_attributes, email: Stweak::Domain::ValueMissing).to_h
+    expect(serialized['email']).to be(Stweak::Domain::ValueMissing)
+  end
+
+  it 'rebuilds a shredded name as the marker, not a value object' do
+    shredded = described_class.new(**valid_attributes, name: Stweak::Domain::ValueMissing)
+    expect(described_class.from_h(shredded.to_h).name).to be(Stweak::Domain::ValueMissing)
+  end
+
+  it 'rebuilds a shredded email as the marker, not a value object' do
+    shredded = described_class.new(**valid_attributes, email: Stweak::Domain::ValueMissing)
+    expect(described_class.from_h(shredded.to_h).email).to be(Stweak::Domain::ValueMissing)
+  end
+
+  it 'rebuilds a present name as a DisplayName' do
+    expect(described_class.from_h(event.to_h).name).to eq(make_display_name('Alice'))
+  end
+
+  it 'rebuilds a present email as an Email' do
+    expect(described_class.from_h(event.to_h).email).to eq(make_email('alice@example.com'))
   end
 end

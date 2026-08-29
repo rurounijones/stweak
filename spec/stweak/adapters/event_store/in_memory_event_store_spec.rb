@@ -41,10 +41,10 @@ RSpec.describe Stweak::Adapters::EventStore::InMemoryEventStore do
       sequence: 1,
       occurred_at: Time.utc(2026, 1, 2, 3, 4, 5),
       account_id: account_id,
-      username: 'alice',
+      username: Stweak::Domain::Accounts::Username.new(value: 'alice'),
       password_hash: 'hash',
-      name: 'Alice',
-      email: 'alice@example.com'
+      name: Stweak::Domain::Accounts::DisplayName.new(value: 'Alice'),
+      email: Stweak::Domain::Accounts::Email.new(value: 'alice@example.com')
     )
   end
 

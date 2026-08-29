@@ -57,7 +57,9 @@ RSpec.describe WebAdmin::Reader do
         stream_id: account_id, expected_version: 0,
         events: [Stweak::Domain::Accounts::AccountCreated.new(
           stream_id: account_id, sequence: 1, occurred_at: now, account_id: account_id,
-          username: username, password_hash: password_hash, name: name, email: email
+          username: Stweak::Domain::Accounts::Username.new(value: username), password_hash: password_hash,
+          name: Stweak::Domain::Accounts::DisplayName.new(value: name),
+          email: Stweak::Domain::Accounts::Email.new(value: email)
         )]
       )
       projection_store.upsert(
@@ -108,6 +110,6 @@ RSpec.describe WebAdmin::Reader do
   it 'reads the events on an account stream, decrypted' do
     id = seed.call(username: 'ada', name: 'Ada', email: 'ada@example.com')
 
-    expect(reader.events(id).map(&:name)).to eq(['Ada'])
+    expect(reader.events(id).map { |event| event.name.to_s }).to eq(['Ada'])
   end
 end

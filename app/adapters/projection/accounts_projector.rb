@@ -65,10 +65,14 @@ module App
         def account_attributes(event)
           {
             account_id: event.account_id.to_s,
-            username: event.username,
+            username: event.username.to_s,
             password_hash: event.password_hash,
-            name: event.name,
-            email: event.email,
+            # The value objects collapse to their strings for the row via
+            # to_stored; a shredded name or email is ValueMissing, whose
+            # to_stored passes the marker through — the form the encrypting
+            # projection store expects.
+            name: event.name.to_stored,
+            email: event.email.to_stored,
             created_at: event.created_at.iso8601
           }
         end

@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require 'sorbet-runtime'
+require_relative '../domain/accounts/username'
 
 module Stweak
   module Ports
@@ -20,9 +21,9 @@ module Stweak
 
       # Whether a username is already in use.
       #
-      # @param username [String]
+      # @param username [Stweak::Domain::Accounts::Username]
       # @return [Boolean]
-      sig { abstract.params(username: String).returns(T::Boolean) }
+      sig { abstract.params(username: Stweak::Domain::Accounts::Username).returns(T::Boolean) }
       def include?(username); end
     end
   end
