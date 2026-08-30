@@ -18,7 +18,11 @@ module App
       # keeps the registry and the event in lockstep — the key cannot drift from
       # what the event writes — and it grows as the domain adds events.
       EVENT_CLASSES = T.let(
-        { Stweak::Domain::Accounts::AccountCreated::TYPE => Stweak::Domain::Accounts::AccountCreated }.freeze,
+        {
+          Stweak::Domain::Accounts::AccountCreated::TYPE => Stweak::Domain::Accounts::AccountCreated,
+          Stweak::Domain::Accounts::AccountDisabled::TYPE => Stweak::Domain::Accounts::AccountDisabled,
+          Stweak::Domain::Accounts::AccountDeleted::TYPE => Stweak::Domain::Accounts::AccountDeleted
+        }.freeze,
         T::Hash[String, T.class_of(Stweak::Domain::Event)]
       )
 

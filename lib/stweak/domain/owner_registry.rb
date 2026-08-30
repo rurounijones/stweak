@@ -6,6 +6,8 @@ require_relative 'aggregate'
 require_relative 'event'
 require_relative 'accounts/account'
 require_relative 'accounts/account_created'
+require_relative 'accounts/account_disabled'
+require_relative 'accounts/account_deleted'
 
 module Stweak
   module Domain
@@ -45,6 +47,8 @@ module Stweak
       end
 
       register(event_class: Accounts::AccountCreated, aggregate_class: Accounts::Account)
+      register(event_class: Accounts::AccountDisabled, aggregate_class: Accounts::Account)
+      register(event_class: Accounts::AccountDeleted, aggregate_class: Accounts::Account)
     end
   end
 end

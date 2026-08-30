@@ -16,9 +16,8 @@ module App
       # The accounts projector: turns the events that concern an account into
       # create/update/delete operations on the accounts table, and ignores the
       # rest, so replaying it over the full log always produces the same table.
-      # Today only AccountCreated matters — it upserts the account's row —
-      # mirroring every field the event records; a rename or deletion will map
-      # to UPDATE and DELETE on the same row.
+      # AccountCreated upserts the account's row; AccountDisabled marks it
+      # disabled without removing data, and AccountDeleted removes the row.
       class AccountsProjector < Stweak::Domain::Projection
         extend T::Sig
 
@@ -38,7 +37,12 @@ module App
         def apply(event)
           case event
           when Stweak::Domain::Accounts::AccountCreated
-            @store.upsert(table: :accounts, attributes: account_attributes(event))
+            @store.upsert(table: :accounts, attributes: account_attributes(event).merge(disabled: false))
+          when Stweak::Domain::Accounts::AccountDisabled
+            row = @store.read_row(table: :accounts, id: event.stream_id.to_s)
+            @store.upsert(table: :accounts, attributes: row.merge(disabled: true)) unless row.nil?
+          when Stweak::Domain::Accounts::AccountDeleted
+            @store.delete_row(table: :accounts, id: event.stream_id.to_s)
           end
         end
 

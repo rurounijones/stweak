@@ -43,6 +43,29 @@ RSpec.describe Stweak::Domain::Accounts::AuthenticateAccount do
     expect(password_hasher).not_to have_received(:verify)
   end
 
+  it 'returns nil when the account is disabled' do
+    allow(password_hasher).to receive(:verify)
+    allow(projection_store).to receive(:read_all).with(table: :accounts).and_return([account.merge(disabled: true)])
+
+    expect(service.call(username: 'alice', password: 'pw')).to be_nil
+  end
+
+  it 'does not verify the password of a disabled account' do
+    allow(password_hasher).to receive(:verify)
+    allow(projection_store).to receive(:read_all).with(table: :accounts).and_return([account.merge(disabled: true)])
+
+    service.call(username: 'alice', password: 'pw')
+
+    expect(password_hasher).not_to have_received(:verify)
+  end
+
+  it 'authenticates an account whose disabled flag is present and false' do
+    allow(password_hasher).to receive(:verify).with(password: 'pw', digest: 'stored-digest').and_return(true)
+    allow(projection_store).to receive(:read_all).with(table: :accounts).and_return([account.merge(disabled: false)])
+
+    expect(service.call(username: 'alice', password: 'pw')).to eq(account.merge(disabled: false))
+  end
+
   it 'returns nil when the password does not verify against the found account' do
     allow(password_hasher).to receive(:verify).with(password: 'pw', digest: 'stored-digest').and_return(false)
 

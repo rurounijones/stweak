@@ -73,6 +73,17 @@ module Stweak
       sig { abstract.returns(Integer) }
       def version; end
 
+      # Whether appending this event requests deletion of the owner's encryption
+      # key after the write succeeds. Like pii_fields, the declaration lives in
+      # the domain because it is a business rule; the encryption adapter honours
+      # it. Subclasses opt in for crypto-shredding.
+      #
+      # @return [Boolean]
+      sig { returns(T::Boolean) }
+      def self.shreds_owner_key?
+        false
+      end
+
       # Fields that hold personal data and must be encrypted at rest. The
       # declaration lives in the domain because it is a business rule; the
       # encryption that honours it lives in an adapter.

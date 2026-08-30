@@ -81,6 +81,7 @@ module Stweak
             expected_version: expected_version,
             events: stamped.map { |event| encrypt(event) }
           )
+          shred_owner_key(owner_type: owner_type, stream_id: stream_id) if shreds?(stamped)
           @subscription&.publish(events: stamped)
         end
 
@@ -121,6 +122,25 @@ module Stweak
         # rubocop:enable Naming/BlockForwarding
 
         private
+
+        # Whether any event in the batch requests shredding its owner's key.
+        #
+        # @param events [Array<Stweak::Domain::Event>]
+        # @return [Boolean]
+        sig { params(events: T::Array[Stweak::Domain::Event]).returns(T::Boolean) }
+        def shreds?(events)
+          events.any? { |event| event.class.shreds_owner_key? }
+        end
+
+        # Delete an owner's encryption key, rendering its personal data
+        # unreadable — the crypto-shredding a deletion event requests.
+        #
+        # @param owner_type [Class<Stweak::Domain::Aggregate>]
+        # @param stream_id [String]
+        sig { params(owner_type: T.class_of(Stweak::Domain::Aggregate), stream_id: Stweak::Domain::Id).void }
+        def shred_owner_key(owner_type:, stream_id:)
+          @key_store.delete(owner_type: owner_type, owner_id: stream_id)
+        end
 
         # A copy of each event with created_at set to the moment just before
         # the write — the single commit moment shared by the whole batch. The

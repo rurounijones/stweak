@@ -128,6 +128,10 @@ RSpec.describe Stweak::Domain::Event do
     expect(described_class.pii_fields).to eq([])
   end
 
+  it 'defaults to not shredding the owner key on the base event' do
+    expect(described_class.shreds_owner_key?).to be(false)
+  end
+
   it 'declares its PII fields' do
     expect(SampleEvent.pii_fields).to eq([:name])
   end

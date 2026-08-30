@@ -3,6 +3,8 @@
 
 require_relative '../../../../lib/stweak/domain/accounts/account'
 require_relative '../../../../lib/stweak/domain/accounts/account_created'
+require_relative '../../../../lib/stweak/domain/accounts/account_disabled'
+require_relative '../../../../lib/stweak/domain/accounts/account_deleted'
 
 # Concise builders for the account value objects, to keep examples short.
 def make_username(value) = Stweak::Domain::Accounts::Username.new(value: value)
@@ -72,7 +74,8 @@ end
 # The state an account exposes, for comparing a restored account with a
 # replayed one.
 def state_fields(account)
-  [account.created, account.username, account.name, account.email, account.password_hash]
+  [account.created, account.disabled, account.deleted, account.username, account.name, account.email,
+   account.password_hash]
 end
 
 RSpec.describe Stweak::Domain::Accounts::Account do
@@ -151,10 +154,101 @@ RSpec.describe Stweak::Domain::Accounts::Account do
     end
   end
 
+  describe '#disable' do
+    before { create_account_on(account) }
+
+    it 'marks the account disabled' do
+      account.disable(occurred_at: occurred_at)
+      expect(account.disabled).to be(true)
+    end
+
+    it 'emits an AccountDisabled event' do
+      account.disable(occurred_at: occurred_at)
+      expect(account.uncommitted_events.last).to be_a(Stweak::Domain::Accounts::AccountDisabled)
+    end
+
+    it 'numbers the disabled event from the aggregate position' do
+      rebuilt = described_class.replay(id: account_id, events: [created_event])
+      rebuilt.disable(occurred_at: occurred_at)
+      expect(rebuilt.uncommitted_events.last.sequence).to eq(2)
+    end
+
+    it 'preserves the account data' do
+      account.disable(occurred_at: occurred_at)
+      expect([account.username.to_s, account.name.pii, account.email.pii]).to eq(%w[alice Alice alice@example.com])
+    end
+
+    it 'rejects disabling an already disabled account, naming the account' do
+      account.disable(occurred_at: occurred_at)
+      expect { account.disable(occurred_at: occurred_at) }
+        .to raise_error(Stweak::Domain::Accounts::AccountAlreadyDisabled, /#{account_id} is already disabled/)
+    end
+
+    it 'rejects disabling a deleted account, naming the account' do
+      account.delete(occurred_at: occurred_at)
+      expect { account.disable(occurred_at: occurred_at) }
+        .to raise_error(Stweak::Domain::Accounts::AccountAlreadyDeleted, /#{account_id} is already deleted/)
+    end
+
+    it 'rejects disabling an account that does not exist, naming the account' do
+      fresh = described_class.new(id: account_id)
+      expect { fresh.disable(occurred_at: occurred_at) }
+        .to raise_error(Stweak::Domain::Accounts::AccountNotFound, /#{account_id} does not exist/)
+    end
+  end
+
+  describe '#delete' do
+    before { create_account_on(account) }
+
+    it 'marks the account deleted' do
+      account.delete(occurred_at: occurred_at)
+      expect(account.deleted).to be(true)
+    end
+
+    it 'emits an AccountDeleted event' do
+      account.delete(occurred_at: occurred_at)
+      expect(account.uncommitted_events.last).to be_a(Stweak::Domain::Accounts::AccountDeleted)
+    end
+
+    it 'numbers the deleted event from the aggregate position' do
+      rebuilt = described_class.replay(id: account_id, events: [created_event])
+      rebuilt.delete(occurred_at: occurred_at)
+      expect(rebuilt.uncommitted_events.last.sequence).to eq(2)
+    end
+
+    it 'rejects deleting an already deleted account, naming the account' do
+      account.delete(occurred_at: occurred_at)
+      expect { account.delete(occurred_at: occurred_at) }
+        .to raise_error(Stweak::Domain::Accounts::AccountAlreadyDeleted, /#{account_id} is already deleted/)
+    end
+
+    it 'rejects deleting an account that does not exist, naming the account' do
+      fresh = described_class.new(id: account_id)
+      expect { fresh.delete(occurred_at: occurred_at) }
+        .to raise_error(Stweak::Domain::Accounts::AccountNotFound, /#{account_id} does not exist/)
+    end
+  end
+
   describe '.replay' do
+    let(:lifecycle_events) do
+      [created_event,
+       Stweak::Domain::Accounts::AccountDisabled.new(stream_id: account_id, sequence: 2, occurred_at: occurred_at),
+       Stweak::Domain::Accounts::AccountDeleted.new(stream_id: account_id, sequence: 3, occurred_at: occurred_at)]
+    end
+
     it 'marks a replayed account as created' do
       rebuilt = described_class.replay(id: account_id, events: [created_event])
       expect(rebuilt.created).to be(true)
+    end
+
+    it 'replays the disabled state' do
+      rebuilt = described_class.replay(id: account_id, events: lifecycle_events)
+      expect(rebuilt.disabled).to be(true)
+    end
+
+    it 'replays the deleted state' do
+      rebuilt = described_class.replay(id: account_id, events: lifecycle_events)
+      expect(rebuilt.deleted).to be(true)
     end
 
     it 'restores the username' do
@@ -197,7 +291,7 @@ RSpec.describe Stweak::Domain::Accounts::Account do
   describe 'checkpointing' do
     it 'restores its state from a checkpoint' do
       restore_alice(account)
-      expect(state_fields(account)).to eq([true, make_username('alice'), make_display_name('Alice'),
+      expect(state_fields(account)).to eq([true, false, false, make_username('alice'), make_display_name('Alice'),
                                            make_email('alice@example.com'), 'hash'])
     end
 
@@ -217,11 +311,17 @@ RSpec.describe Stweak::Domain::Accounts::Account do
       expect(account.created).to be(false)
     end
 
+    it 'restores the disabled and deleted flags from their stored values' do
+      account.restore('created' => true, 'disabled' => true, 'deleted' => true, 'username' => 'alice',
+                      'password_hash' => 'hash', 'name' => 'Alice', 'email' => 'alice@example.com')
+      expect([account.disabled, account.deleted]).to eq([true, true])
+    end
+
     it 'checkpoints the state at the hundredth event' do
       checkpoint = replayed_account(account_id, occurred_at, 100).checkpoint
       expect(checkpoint.state).to eq(
-        'created' => true, 'username' => 'user-100', 'password_hash' => 'hash', 'name' => 'Name 100',
-        'email' => 'user100@example.com'
+        'created' => true, 'disabled' => false, 'deleted' => false, 'username' => 'user-100',
+        'password_hash' => 'hash', 'name' => 'Name 100', 'email' => 'user100@example.com'
       )
     end
 

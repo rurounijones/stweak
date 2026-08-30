@@ -17,13 +17,24 @@ RSpec.describe App::Adapters::SqliteProjectionStore do
   let(:path) { File.join(Dir.tmpdir, "stweak_projection_#{object_id}.db") }
   let(:first_store) { described_class.new(db: SQLite3::Database.new(path)) }
   let(:row) do
-    { account_id: '1', username: 'alice', password_hash: 'h', name_cipher: 'n', email_cipher: 'e', created_at: 't' }
+    { account_id: '1', username: 'alice', disabled: 0, password_hash: 'h', name_cipher: 'n',
+      email_cipher: 'e', created_at: 't' }
   end
 
   it_behaves_like 'a projection store'
 
   it 'rejects a table it does not host' do
     expect { store.upsert(table: :unknown, attributes: {}) }.to raise_error(ArgumentError, /unknown/)
+  end
+
+  it 'binds a true lifecycle flag as its integer form' do
+    store.upsert(table: :accounts, attributes: row.merge(disabled: true))
+    expect(store.read_all(table: :accounts).first[:disabled]).to eq(1)
+  end
+
+  it 'binds a false lifecycle flag as its integer form' do
+    store.upsert(table: :accounts, attributes: row.merge(disabled: false))
+    expect(store.read_all(table: :accounts).first[:disabled]).to eq(0)
   end
 
   it 'survives a reconnect, so a restarted projector resumes its cursors' do

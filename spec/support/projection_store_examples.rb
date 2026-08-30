@@ -13,6 +13,7 @@ RSpec.shared_examples 'a projection store' do
     {
       account_id: account_id,
       username: 'alice',
+      disabled: 0,
       password_hash: 'hash',
       name_cipher: 'Alice',
       email_cipher: 'alice@example.com',

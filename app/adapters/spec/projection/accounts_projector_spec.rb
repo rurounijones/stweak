@@ -4,6 +4,8 @@
 require_relative '../spec_helper'
 require_relative '../../projection/accounts_projector'
 require_relative '../../../../lib/stweak/adapters/projection_store/in_memory'
+require_relative '../../../../lib/stweak/domain/accounts/account_disabled'
+require_relative '../../../../lib/stweak/domain/accounts/account_deleted'
 
 # The stream and owner the examples project from.
 ACCOUNT_ID = Stweak::Domain::Accounts::AccountId.new(value: '00000000-0000-4000-8000-000000000001')
@@ -41,12 +43,8 @@ RSpec.describe App::Adapters::Projection::AccountsProjector do
 
   let(:expected_row) do
     {
-      account_id: ACCOUNT_ID.to_s,
-      username: 'alice',
-      password_hash: 'hash',
-      name: 'Alice',
-      email: 'alice@example.com',
-      created_at: OCCURRED_AT.iso8601
+      account_id: ACCOUNT_ID.to_s, username: 'alice', password_hash: 'hash', name: 'Alice',
+      email: 'alice@example.com', created_at: OCCURRED_AT.iso8601, disabled: false
     }
   end
 
@@ -61,7 +59,30 @@ RSpec.describe App::Adapters::Projection::AccountsProjector do
     expect(store.read_all(table: :accounts)).to eq([expected_row.merge(name: 'Alice Smith')])
   end
 
-  it 'ignores events that are not AccountCreated' do
+  it 'marks an account disabled without removing its row' do
+    projector.apply(created_event)
+    projector.apply(Stweak::Domain::Accounts::AccountDisabled.new(
+                      stream_id: ACCOUNT_ID, sequence: 2, occurred_at: OCCURRED_AT
+                    ))
+    expect(store.read_all(table: :accounts)).to eq([expected_row.merge(disabled: true)])
+  end
+
+  it 'ignores an AccountDisabled event for an account with no projected row' do
+    projector.apply(Stweak::Domain::Accounts::AccountDisabled.new(
+                      stream_id: ACCOUNT_ID, sequence: 2, occurred_at: OCCURRED_AT
+                    ))
+    expect(store.read_all(table: :accounts)).to eq([])
+  end
+
+  it 'deletes an account row' do
+    projector.apply(created_event)
+    projector.apply(Stweak::Domain::Accounts::AccountDeleted.new(
+                      stream_id: ACCOUNT_ID, sequence: 2, occurred_at: OCCURRED_AT
+                    ))
+    expect(store.read_all(table: :accounts)).to eq([])
+  end
+
+  it 'ignores events that are not account lifecycle events' do
     projector.apply(SomeOtherEvent.new(stream_id: ACCOUNT_ID, sequence: 1, occurred_at: OCCURRED_AT))
     expect(store.read_all(table: :accounts)).to eq([])
   end

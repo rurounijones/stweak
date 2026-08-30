@@ -78,7 +78,8 @@ end
 # The state an account exposes, for comparing a handled account with one
 # replayed from the events the handler appended.
 def account_state(account)
-  [account.created, account.username, account.name, account.password_hash]
+  [account.created, account.disabled, account.deleted, account.username, account.name,
+   account.password_hash]
 end
 
 # The events the handler appended for one stream, in append order, drawn from
@@ -195,7 +196,7 @@ RSpec.describe Stweak::Domain::Accounts::CreateAccountHandler do
   it 'returns the account for a retried create' do
     allow(event_store).to receive(:read_stream).and_return([account_created_events(ACCOUNT_ID, 1).first])
     retried = handler.handle(build_create_account_command(account_id: ACCOUNT_ID, username: 'user-1'))
-    expect(account_state(retried)).to eq([true, a_username('user-1'), a_display_name('Name 1'), 'hash'])
+    expect(account_state(retried)).to eq([true, false, false, a_username('user-1'), a_display_name('Name 1'), 'hash'])
   end
 
   it 'does not append a second event for a retried create' do

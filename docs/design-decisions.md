@@ -302,12 +302,14 @@ unanswered, because a broken object cannot be built.
 ## Encryption at the event-store boundary
 
 The event class declares which fields are personal data — for example,
-`AccountCreated.pii_fields` returns `[:name]`. That declaration is a business
-rule, a statement of what the law requires to be erasable, so it lives in the
-domain. The cryptography that honours it lives in an adapter: an
+`AccountCreated.pii_fields` returns `[:name]`. It can also declare that an event
+shreds its owner's key, as `AccountDeleted` does. Those declarations are business
+rules, statements of what the law requires to be erasable, so they live in the
+domain. The cryptography that honours them lives in an adapter: an
 `EncryptingEventStore` decorates a raw event store, encrypting every PII field
-on append and decrypting it back on read. The domain emits and receives the
-plaintext name and never knows what AES-256-GCM is.
+on append, deleting the owner's key after a successful deletion append, and
+decrypting on read. The domain emits and receives plaintext and never knows what
+AES-256-GCM is.
 
 The cipher is AES-256-GCM with a random 256-bit key and a fresh nonce per
 encryption; the nonce and authentication tag are stored alongside the

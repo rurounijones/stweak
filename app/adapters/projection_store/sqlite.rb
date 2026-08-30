@@ -75,8 +75,19 @@ module App
         assert_table!(table)
         columns = attributes.keys.map(&:to_s)
         placeholders = columns.map { '?' }.join(', ')
-        values = attributes.values
+        values = attributes.values.map { |value| to_stored_value(value) }
         @db.execute("INSERT OR REPLACE INTO #{table} (#{columns.join(', ')}) VALUES (#{placeholders})", values)
+      end
+
+      # SQLite cannot bind Ruby booleans, so the lifecycle flag round-trips as
+      # its integer form; every other value binds as itself.
+      sig { params(value: T.untyped).returns(T.untyped) }
+      def to_stored_value(value)
+        case value
+        when true then 1
+        when false then 0
+        else value
+        end
       end
 
       # @param table [Symbol]
@@ -132,12 +143,14 @@ module App
         SQL
       end
 
+      # rubocop:disable Metrics/MethodLength -- a table's columns are one per line
       sig { void }
       def create_accounts_table
         @db.execute(<<~SQL)
           CREATE TABLE IF NOT EXISTS accounts (
             account_id     TEXT PRIMARY KEY,
             username       TEXT NOT NULL,
+            disabled       INTEGER NOT NULL DEFAULT 0,
             password_hash  TEXT NOT NULL,
             name_cipher    TEXT NOT NULL,
             email_cipher   TEXT NOT NULL,
@@ -145,6 +158,7 @@ module App
           )
         SQL
       end
+      # rubocop:enable Metrics/MethodLength
 
       # @param table [Symbol]
       # @raise [ArgumentError] if the store does not host the table

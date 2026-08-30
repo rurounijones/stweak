@@ -39,6 +39,7 @@ module Stweak
         def call(username:, password:)
           account = find_account(username)
           return unless account
+          return if account[:disabled]
           return unless @password_hasher.verify(password: password, digest: account.fetch(:password_hash).to_s)
 
           account
