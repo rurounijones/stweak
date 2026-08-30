@@ -6,6 +6,8 @@ require_relative '../aggregate'
 require_relative '../error'
 require_relative '../value_missing'
 require_relative 'account_created'
+require_relative 'account_disabled'
+require_relative 'account_deleted'
 require_relative 'display_name'
 require_relative 'email'
 require_relative 'username'
@@ -20,6 +22,15 @@ module Stweak
       # clashes with the account already existing.
       class AccountAlreadyExists < ConflictError; end
 
+      # Raised when an account is disabled more than once.
+      class AccountAlreadyDisabled < ConflictError; end
+
+      # Raised when an account is deleted more than once.
+      class AccountAlreadyDeleted < ConflictError; end
+
+      # Raised when an account lifecycle command addresses no created account.
+      class AccountNotFound < NotFoundError; end
+
       # Raised when an account is created with a username another account
       # already uses. A conflict, in the domain taxonomy: the change clashes
       # with an existing username. The rule spans aggregates — no single
@@ -27,9 +38,13 @@ module Stweak
       # time against the read model of usernames, not by the aggregate.
       class UsernameTaken < ConflictError; end
 
-      # The Account aggregate. Guards the rules around creating an account, and
-      # derives its state by replaying its own stream rather than from a stored
-      # record.
+      # The Account aggregate. Guards the rules around creating, disabling and
+      # deleting an account, and derives its state by replaying its own stream
+      # rather than from a stored record.
+      #
+      # rubocop:disable Metrics/ClassLength -- the aggregate guards three
+      # lifecycle transitions and serializes its own state for checkpointing;
+      # the extra length is that behaviour, not incidental bloat.
       class Account < Aggregate
         extend T::Sig
 
@@ -46,6 +61,14 @@ module Stweak
         # Whether an AccountCreated event has been applied.
         sig { returns(T::Boolean) }
         attr_reader :created
+
+        # Whether an AccountDisabled event has been applied.
+        sig { returns(T::Boolean) }
+        attr_reader :disabled
+
+        # Whether an AccountDeleted event has been applied.
+        sig { returns(T::Boolean) }
+        attr_reader :deleted
 
         sig { returns(T.any(Username, T.class_of(ValueMissing))) }
         attr_reader :username
@@ -64,6 +87,8 @@ module Stweak
         def initialize(id:)
           super
           @created = T.let(false, T::Boolean)
+          @disabled = T.let(false, T::Boolean)
+          @deleted = T.let(false, T::Boolean)
           @password_hash = T.let('', String)
           # An account that has not been created yet has no username, name or
           # email. The absence is ValueMissing rather than nil or an empty
@@ -101,16 +126,42 @@ module Stweak
           )
         end
 
+        # Disable the account, preserving all account data.
+        #
+        # @param occurred_at [Time]
+        # @raise [AccountNotFound] if the account has not been created
+        # @raise [AccountAlreadyDeleted] if the account is already deleted
+        # @raise [AccountAlreadyDisabled] if the account is already disabled
+        sig { params(occurred_at: Time).void }
+        def disable(occurred_at:)
+          raise AccountNotFound, "account #{id} does not exist" unless created
+          raise AccountAlreadyDeleted, "account #{id} is already deleted" if deleted
+          raise AccountAlreadyDisabled, "account #{id} is already disabled" if disabled
+
+          record(AccountDisabled.new(stream_id: id, sequence: expected_version + 1, occurred_at: occurred_at))
+        end
+
+        # Delete the account, leaving its event history for the store adapter to
+        # crypto-shred and its projection for the projector to remove.
+        #
+        # @param occurred_at [Time]
+        # @raise [AccountNotFound] if the account has not been created
+        # @raise [AccountAlreadyDeleted] if the account is already deleted
+        sig { params(occurred_at: Time).void }
+        def delete(occurred_at:)
+          raise AccountNotFound, "account #{id} does not exist" unless created
+          raise AccountAlreadyDeleted, "account #{id} is already deleted" if deleted
+
+          record(AccountDeleted.new(stream_id: id, sequence: expected_version + 1, occurred_at: occurred_at))
+        end
+
         # @param event [Event]
         sig { override.params(event: Event).void }
         def apply(event)
           case event
-          when AccountCreated
-            @created = true
-            @username = event.username
-            @password_hash = event.password_hash
-            @name = event.name
-            @email = event.email
+          when AccountCreated then apply_created(event)
+          when AccountDisabled then @disabled = true
+          when AccountDeleted then @deleted = true
           else
             # A stream containing an event this aggregate does not know is a
             # corrupt-stream or history-mismatch bug, not a condition a caller
@@ -129,7 +180,8 @@ module Stweak
         sig { override.returns(T::Hash[String, T.untyped]) }
         def checkpoint_state
           {
-            'created' => @created, 'username' => @username.to_s, 'password_hash' => @password_hash,
+            'created' => @created, 'disabled' => @disabled, 'deleted' => @deleted,
+            'username' => @username.to_s, 'password_hash' => @password_hash,
             'name' => @name.to_stored, 'email' => @email.to_stored
           }
         end
@@ -155,6 +207,8 @@ module Stweak
           name = state.fetch('name')
           email = state.fetch('email')
           @created = state.fetch('created')
+          @disabled = state.fetch('disabled', false)
+          @deleted = state.fetch('deleted', false)
           @username = Username.new(value: state.fetch('username'))
           @password_hash = state.fetch('password_hash')
           @name = wrap_pii(name) { |string| DisplayName.new(value: string) }
@@ -162,6 +216,18 @@ module Stweak
         end
 
         private
+
+        # Apply an AccountCreated event, filling in the account's fields.
+        #
+        # @param event [AccountCreated]
+        sig { params(event: AccountCreated).void }
+        def apply_created(event)
+          @created = true
+          @username = event.username
+          @password_hash = event.password_hash
+          @name = event.name
+          @email = event.email
+        end
 
         # Re-wrap a restored PII field. A serialized value is a string, which the
         # block turns into its value object; the ValueMissing marker of a
@@ -187,6 +253,7 @@ module Stweak
         end
         # rubocop:enable Naming/BlockForwarding
       end
+      # rubocop:enable Metrics/ClassLength
     end
   end
 end

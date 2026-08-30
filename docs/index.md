@@ -151,7 +151,10 @@ Both Accounts and Players have the typical CRUD actions:
 - **Read** - retrieving an Account or Player as it currently stands.
 - **Update** - changing what is held about them, such as a display name or
   contact details.
-- **Delete** - removing an Account or Player from active use.
+- **Delete** - removing an Account or Player from active use. For an Account,
+  deletion is recorded as an `AccountDeleted` event; the projection row is
+  removed and the encryption key is deleted, while the append-only event stream
+  remains.
 
 Delete is worth pausing on, because in a system that never rewrites its log it
 cannot mean what it usually means. Deleting is itself an event: the record of

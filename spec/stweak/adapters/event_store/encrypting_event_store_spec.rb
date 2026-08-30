@@ -8,6 +8,7 @@ require_relative '../../../../lib/stweak/adapters/event_subscription/in_memory'
 require_relative '../../../../lib/stweak/adapters/key_store/in_memory'
 require_relative '../../../../lib/stweak/adapters/encryption/aes_gcm'
 require_relative '../../../../lib/stweak/domain/accounts/account_created'
+require_relative '../../../../lib/stweak/domain/accounts/account_deleted'
 require_relative '../../../support/event_subscription_examples'
 require_relative '../../../support/property/domain_generators'
 
@@ -147,6 +148,14 @@ RSpec.describe Stweak::Adapters::EventStore::EncryptingEventStore do
     next_event = created_event.with('sequence' => 2)
     store.append(owner_type: owner_type, stream_id: account_id, expected_version: 1, events: [next_event])
     expect(key_store.get(owner_type: Stweak::Domain::Accounts::Account, owner_id: account_id)).to eq(first)
+  end
+
+  it 'shreds the owner key after an AccountDeleted append' do
+    store.append(owner_type: owner_type, stream_id: account_id, expected_version: 0, events: [created_event])
+    deleted = Stweak::Domain::Accounts::AccountDeleted
+              .new(stream_id: account_id, sequence: 2, occurred_at: created_event.occurred_at)
+    store.append(owner_type: owner_type, stream_id: account_id, expected_version: 1, events: [deleted])
+    expect(key_store.get(owner_type: owner_type, owner_id: account_id)).to be_nil
   end
 
   it 'reads ValueMissing for personal data after the key is shredded' do

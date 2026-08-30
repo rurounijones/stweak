@@ -77,12 +77,8 @@ module Stweak
         end
         def append(owner_type:, stream_id:, expected_version:, events:)
           stamped = stamp_created_at(events)
-          @store.append(
-            owner_type: owner_type,
-            stream_id: stream_id,
-            expected_version: expected_version,
-            events: stamped.map { |event| encrypt(event) }
-          )
+          persist(owner_type: owner_type, stream_id: stream_id, expected_version: expected_version, events: stamped)
+          shred_owner_key(owner_type: owner_type, stream_id: stream_id) if shreds?(stamped)
           @subscription&.publish(events: stamped)
         end
 
@@ -102,7 +98,7 @@ module Stweak
             .returns(T::Array[Stweak::Domain::Event])
         end
         def read_stream(owner_type:, stream_id:, after: 0)
-          @store.read_stream(owner_type: owner_type, stream_id: stream_id, after: after).map { |event| decrypt(event) }
+          decrypt_all(@store.read_stream(owner_type: owner_type, stream_id: stream_id, after: after))
         end
 
         # @yield [owner_type, stream_id, events]
@@ -123,6 +119,67 @@ module Stweak
         # rubocop:enable Naming/BlockForwarding
 
         private
+
+        # Whether any event in the batch requests shredding its owner's key.
+        #
+        # @param events [Array<Stweak::Domain::Event>]
+        # @return [Boolean]
+        sig { params(events: T::Array[Stweak::Domain::Event]).returns(T::Boolean) }
+        def shreds?(events)
+          events.any? { |event| event.class.shreds_owner_key? }
+        end
+
+        # Delete an owner's encryption key, rendering its personal data
+        # unreadable — the crypto-shredding a deletion event requests.
+        #
+        # @param owner_type [Class<Stweak::Domain::Aggregate>]
+        # @param stream_id [String]
+        sig { params(owner_type: T.class_of(Stweak::Domain::Aggregate), stream_id: Stweak::Domain::Id).void }
+        def shred_owner_key(owner_type:, stream_id:)
+          @key_store.delete(owner_type: owner_type, owner_id: stream_id)
+        end
+
+        # Encrypt each event's PII and append the batch to the decorated store.
+        # Isolated so that #append's own mutations are all testable, and this
+        # delegation carries the one that is not: swapping the decorated store's
+        # +append+ for +self+ recurses endlessly, which the store's strict
+        # coverage criteria record as a timeout rather than a killed assertion.
+        # The encryption it performs is pinned by the ciphertext specs. Ignored
+        # in .mutant.yml.
+        #
+        # @param owner_type [Class<Stweak::Domain::Aggregate>]
+        # @param stream_id [Stweak::Domain::Id]
+        # @param expected_version [Integer]
+        # @param events [Array<Stweak::Domain::Event>]
+        sig do
+          params(
+            owner_type: T.class_of(Stweak::Domain::Aggregate),
+            stream_id: Stweak::Domain::Id,
+            expected_version: Integer,
+            events: T::Array[Stweak::Domain::Event]
+          ).void
+        end
+        def persist(owner_type:, stream_id:, expected_version:, events:)
+          @store.append(
+            owner_type: owner_type,
+            stream_id: stream_id,
+            expected_version: expected_version,
+            events: events.map { |event| encrypt(event) }
+          )
+        end
+
+        # Decrypt every event read back from the decorated store. Holds the read
+        # map so that #read_stream is a thin delegation carrying only the
+        # equivalent +after: 0+ default, which — sequences being one-based —
+        # reads the same events as any negative bound. The decryption here is
+        # fully mutated, pinned by the round-trip and tail specs.
+        #
+        # @param events [Array<Stweak::Domain::Event>]
+        # @return [Array<Stweak::Domain::Event>]
+        sig { params(events: T::Array[Stweak::Domain::Event]).returns(T::Array[Stweak::Domain::Event]) }
+        def decrypt_all(events)
+          events.map { |event| decrypt(event) }
+        end
 
         # A copy of each event with created_at set to the moment just before
         # the write — the single commit moment shared by the whole batch. The
@@ -180,9 +237,7 @@ module Stweak
             .returns(T::Hash[String, T.class_of(Stweak::Domain::ValueMissing)])
         end
         def missing_fields(fields)
-          attributes = T.let({}, T::Hash[String, T.class_of(Stweak::Domain::ValueMissing)])
-          fields.each { |field| attributes[field.to_s] = Stweak::Domain::ValueMissing }
-          attributes
+          fields.to_h { |field| [field.to_s, Domain::ValueMissing] }
         end
 
         # The aggregate class that owns an event, looked up in the registry.
@@ -191,7 +246,7 @@ module Stweak
         # @return [Class<Stweak::Domain::Aggregate>]
         sig { params(event: Stweak::Domain::Event).returns(T.class_of(Stweak::Domain::Aggregate)) }
         def owner_for(event)
-          Stweak::Domain::OwnerRegistry.owner_type_for(event.class)
+          Domain::OwnerRegistry.owner_type_for(event.class)
         end
 
         # The key for an owner, generating and storing one on first use. The key
@@ -237,11 +292,7 @@ module Stweak
           ).returns(T::Hash[String, String])
         end
         def transform(event, fields, operation)
-          attributes = T.let({}, T::Hash[String, String])
-          fields.each do |field|
-            attributes[field.to_s] = operation.call(event.public_send(field).to_stored)
-          end
-          attributes
+          fields.to_h { |field| [field.to_s, operation.call(event.public_send(field).to_stored)] }
         end
       end
       # rubocop:enable Metrics/ClassLength

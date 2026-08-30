@@ -35,6 +35,9 @@ __pycache__/
 .DS_Store
 *.swp
 
+# Claude Code local settings
+/.claude/
+
 # SQLite files created by the data generator
 *.db
 
