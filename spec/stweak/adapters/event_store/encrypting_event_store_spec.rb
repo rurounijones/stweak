@@ -92,23 +92,23 @@ RSpec.describe Stweak::Adapters::EventStore::EncryptingEventStore do
       sequence: 1,
       occurred_at: Time.utc(2026, 1, 2, 3, 4, 5),
       account_id: account_id,
-      username: 'alice',
+      username: Stweak::Domain::Accounts::Username.new(value: 'alice'),
       password_hash: 'hash',
-      name: 'Alice',
-      email: 'alice@example.com'
+      name: Stweak::Domain::Accounts::DisplayName.new(value: 'Alice'),
+      email: Stweak::Domain::Accounts::Email.new(value: 'alice@example.com')
     )
   end
 
   it 'persists the name as ciphertext' do
     store.append(owner_type: owner_type, stream_id: account_id, expected_version: 0, events: [created_event])
     stored = raw_store.read_stream(owner_type: owner_type, stream_id: account_id).first
-    expect(stored.name).not_to eq('Alice')
+    expect(stored.name.pii).not_to eq('Alice')
   end
 
   it 'persists non-PII fields in plaintext' do
     store.append(owner_type: owner_type, stream_id: account_id, expected_version: 0, events: [created_event])
     stored = raw_store.read_stream(owner_type: owner_type, stream_id: account_id).first
-    expect(stored.username).to eq('alice')
+    expect(stored.username.to_s).to eq('alice')
   end
 
   it 'round-trips the plaintext on read' do
@@ -133,7 +133,7 @@ RSpec.describe Stweak::Adapters::EventStore::EncryptingEventStore do
     store.append(owner_type: owner_type, stream_id: account_id, expected_version: 0,
                  events: [created_event, second_event])
     tail = store.read_stream(owner_type: owner_type, stream_id: account_id, after: 1)
-    expect(tail.map(&:name)).to eq(['Bob'])
+    expect(tail.map { |event| event.name.pii }).to eq(['Bob'])
   end
 
   it 'creates a key for the owner on first append' do
@@ -160,7 +160,7 @@ RSpec.describe Stweak::Adapters::EventStore::EncryptingEventStore do
     store.append(owner_type: owner_type, stream_id: account_id, expected_version: 0, events: [created_event])
     key_store.delete(owner_type: Stweak::Domain::Accounts::Account, owner_id: account_id)
     event = store.read_stream(owner_type: owner_type, stream_id: account_id).first
-    expect(event.username).to eq('alice')
+    expect(event.username.to_s).to eq('alice')
   end
 
   it 'does not encrypt events without PII on append' do

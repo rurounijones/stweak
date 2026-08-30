@@ -13,6 +13,10 @@ require_relative '../../../../lib/stweak/ports/checkpoint_store'
 require_relative '../../../../lib/stweak/ports/usernames'
 require_relative '../../../support/property/domain_generators'
 
+# Concise builders for the account value objects, to keep examples short.
+def a_username(value) = Stweak::Domain::Accounts::Username.new(value: value)
+def a_display_name(value) = Stweak::Domain::Accounts::DisplayName.new(value: value)
+
 ACCOUNT_OWNER_TYPE = Stweak::Domain::Accounts::Account
 ACCOUNT_ID = Stweak::Domain::Accounts::AccountId.new(value: '00000000-0000-4000-8000-000000000001')
 OTHER_ACCOUNT_ID = Stweak::Domain::Accounts::AccountId.new(value: '00000000-0000-4000-8000-000000000002')
@@ -24,8 +28,9 @@ def account_created_events(account_id, count)
   (1..count).map do |sequence|
     Stweak::Domain::Accounts::AccountCreated.new(
       stream_id: account_id, sequence: sequence, occurred_at: Time.utc(2026, 1, 2, 3, 4, 5), account_id: account_id,
-      username: "user-#{sequence}", password_hash: 'hash', name: "Name #{sequence}",
-      email: "user#{sequence}@example.com"
+      username: Stweak::Domain::Accounts::Username.new(value: "user-#{sequence}"), password_hash: 'hash',
+      name: Stweak::Domain::Accounts::DisplayName.new(value: "Name #{sequence}"),
+      email: Stweak::Domain::Accounts::Email.new(value: "user#{sequence}@example.com")
     )
   end
 end
@@ -51,10 +56,10 @@ def build_create_account_command(account_id:, username: 'alice', password: 'hunt
                                  email: 'alice@example.com')
   Stweak::Domain::Accounts::CreateAccount.new(
     account_id: account_id,
-    username: username,
+    username: Stweak::Domain::Accounts::Username.new(value: username),
     password: password,
-    name: name,
-    email: email
+    name: Stweak::Domain::Accounts::DisplayName.new(value: name),
+    email: Stweak::Domain::Accounts::Email.new(value: email)
   )
 end
 
@@ -63,7 +68,7 @@ end
 def command_with_unique_username(command)
   Stweak::Domain::Accounts::CreateAccount.new(
     account_id: command.account_id,
-    username: "user-#{command.account_id}",
+    username: Stweak::Domain::Accounts::Username.new(value: "user-#{command.account_id}"),
     password: command.password,
     name: command.name,
     email: command.email
@@ -136,12 +141,14 @@ RSpec.describe Stweak::Domain::Accounts::CreateAccountHandler do
 
   it 'stores the username in the event' do
     handler.handle(build_create_account_command(account_id: ACCOUNT_ID))
-    expect(appended_events(appends, ACCOUNT_ID).first.username).to eq('alice')
+    expect(appended_events(appends, ACCOUNT_ID).first.username)
+      .to eq(Stweak::Domain::Accounts::Username.new(value: 'alice'))
   end
 
   it 'stores the plaintext name in the event' do
     handler.handle(build_create_account_command(account_id: ACCOUNT_ID))
-    expect(appended_events(appends, ACCOUNT_ID).first.name).to eq('Alice')
+    expect(appended_events(appends, ACCOUNT_ID).first.name)
+      .to eq(Stweak::Domain::Accounts::DisplayName.new(value: 'Alice'))
   end
 
   it 'hashes the command password through the hasher' do
@@ -166,7 +173,8 @@ RSpec.describe Stweak::Domain::Accounts::CreateAccountHandler do
   end
 
   it 'rejects a username another account already uses' do
-    allow(usernames).to receive(:include?).with('alice').and_return(true)
+    allow(usernames).to receive(:include?)
+      .with(Stweak::Domain::Accounts::Username.new(value: 'alice')).and_return(true)
     expect { handler.handle(build_create_account_command(account_id: OTHER_ACCOUNT_ID)) }
       .to raise_error(Stweak::Domain::Accounts::UsernameTaken, /username alice is already in use/)
   end
@@ -178,7 +186,8 @@ RSpec.describe Stweak::Domain::Accounts::CreateAccountHandler do
 
   it 'reports the account conflict, not a username collision, for a recreated account' do
     allow(event_store).to receive(:read_stream).and_return(account_created_events(ACCOUNT_ID, 1))
-    allow(usernames).to receive(:include?).with('bob').and_return(true)
+    allow(usernames).to receive(:include?)
+      .with(Stweak::Domain::Accounts::Username.new(value: 'bob')).and_return(true)
     expect { handler.handle(build_create_account_command(account_id: ACCOUNT_ID, username: 'bob')) }
       .to raise_error(Stweak::Domain::Accounts::AccountAlreadyExists)
   end
@@ -186,7 +195,7 @@ RSpec.describe Stweak::Domain::Accounts::CreateAccountHandler do
   it 'returns the account for a retried create' do
     allow(event_store).to receive(:read_stream).and_return([account_created_events(ACCOUNT_ID, 1).first])
     retried = handler.handle(build_create_account_command(account_id: ACCOUNT_ID, username: 'user-1'))
-    expect(account_state(retried)).to eq([true, 'user-1', 'Name 1', 'hash'])
+    expect(account_state(retried)).to eq([true, a_username('user-1'), a_display_name('Name 1'), 'hash'])
   end
 
   it 'does not append a second event for a retried create' do
@@ -214,7 +223,8 @@ RSpec.describe Stweak::Domain::Accounts::CreateAccountHandler do
 
   it 'restores a stored checkpoint when loading an account' do
     allow(checkpoint_store).to receive(:get).and_return(created_account_checkpoint)
-    expect(handler.send(:load_account, ACCOUNT_ID).username).to eq('alice')
+    expect(handler.send(:load_account, ACCOUNT_ID).username)
+      .to eq(Stweak::Domain::Accounts::Username.new(value: 'alice'))
   end
 
   it 'loads the checkpoint for the account being loaded' do

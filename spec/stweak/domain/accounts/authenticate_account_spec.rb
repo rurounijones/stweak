@@ -4,6 +4,10 @@
 require_relative '../../../../lib/stweak/domain/accounts/authenticate_account'
 require_relative '../../../../lib/stweak/ports/projection_store'
 require_relative '../../../../lib/stweak/domain/security/password_hasher'
+require_relative '../../../../lib/stweak/domain/accounts/username'
+
+# Concise builder for the username value object the service speaks in.
+def un(value) = Stweak::Domain::Accounts::Username.new(value: value)
 
 RSpec.describe Stweak::Domain::Accounts::AuthenticateAccount do
   subject(:service) do
@@ -26,19 +30,19 @@ RSpec.describe Stweak::Domain::Accounts::AuthenticateAccount do
   it 'returns the matching account when the password verifies' do
     allow(password_hasher).to receive(:verify).with(password: 'pw', digest: 'stored-digest').and_return(true)
 
-    expect(service.call(username: 'alice', password: 'pw')).to eq(account)
+    expect(service.call(username: un('alice'), password: 'pw')).to eq(account)
   end
 
   it 'returns nil when no account has the username' do
     allow(password_hasher).to receive(:verify)
 
-    expect(service.call(username: 'nobody', password: 'pw')).to be_nil
+    expect(service.call(username: un('nobody'), password: 'pw')).to be_nil
   end
 
   it 'does not attempt to verify when no account has the username' do
     allow(password_hasher).to receive(:verify)
 
-    service.call(username: 'nobody', password: 'pw')
+    service.call(username: un('nobody'), password: 'pw')
 
     expect(password_hasher).not_to have_received(:verify)
   end
@@ -46,13 +50,13 @@ RSpec.describe Stweak::Domain::Accounts::AuthenticateAccount do
   it 'returns nil when the password does not verify against the found account' do
     allow(password_hasher).to receive(:verify).with(password: 'pw', digest: 'stored-digest').and_return(false)
 
-    expect(service.call(username: 'alice', password: 'pw')).to be_nil
+    expect(service.call(username: un('alice'), password: 'pw')).to be_nil
   end
 
   it 'verifies against the found account digest coerced to a string, not another account' do
     allow(password_hasher).to receive(:verify).and_return(true)
 
-    service.call(username: 'alice', password: 'pw')
+    service.call(username: un('alice'), password: 'pw')
 
     expect(password_hasher).to have_received(:verify).with(password: 'pw', digest: 'stored-digest')
   end
@@ -61,6 +65,6 @@ RSpec.describe Stweak::Domain::Accounts::AuthenticateAccount do
     allow(projection_store).to receive(:read_all).with(table: :accounts).and_return([{ password_hash: 'x' }, account])
     allow(password_hasher).to receive(:verify).with(password: 'pw', digest: 'stored-digest').and_return(true)
 
-    expect(service.call(username: 'alice', password: 'pw')).to eq(account)
+    expect(service.call(username: un('alice'), password: 'pw')).to eq(account)
   end
 end

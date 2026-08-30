@@ -26,7 +26,9 @@ RSpec.describe Stweak::Adapters::EventSubscription::InMemoryEventSubscription do
     Stweak::Domain::Accounts::AccountCreated.new(
       stream_id: stream_id, sequence: 1, occurred_at: Time.utc(2026, 1, 2, 3, 4, 5),
       account_id: Stweak::Domain::Accounts::AccountId.new(value: stream_id.to_s),
-      username: 'alice', password_hash: 'hash', name: 'Alice', email: 'alice@example.com'
+      username: Stweak::Domain::Accounts::Username.new(value: 'alice'), password_hash: 'hash',
+      name: Stweak::Domain::Accounts::DisplayName.new(value: 'Alice'),
+      email: Stweak::Domain::Accounts::Email.new(value: 'alice@example.com')
     )
   end
 

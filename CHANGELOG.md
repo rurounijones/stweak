@@ -16,6 +16,13 @@ adheres to [Semantic Versioning][semver].
 - The Account domain: the `Account` aggregate, the `AccountCreated` event, the
   `CreateAccount` command and its handler, and the event-sourcing substrate
   they sit on (the `Event`, `Command` and `Aggregate` bases).
+- Named value objects for the Account's meaning-bearing strings — `Username`,
+  `Email` and `DisplayName` — in place of bare `String`s. The two that carry
+  personal data, `Email` and `DisplayName`, mask themselves when rendered:
+  `to_s` and `inspect` return a fixed mask, and the real value is reachable
+  only through a `pii` method, so a value that leaks into a log line or an
+  error message reveals nothing. `Username` is not personal data and renders
+  plainly.
 - The ports the domain depends on (`EventStore`, `KeyStore`, `PasswordHasher`)
   and the in-memory and crypto adapters that implement them (`InMemoryEventStore`,
   `EncryptingEventStore`, `InMemoryKeyStore`, `Pbkdf2PasswordHasher`,

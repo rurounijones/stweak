@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require 'sorbet-runtime'
+require_relative 'username'
 require_relative '../security/password_hasher'
 require_relative '../../ports/projection_store'
 
@@ -29,11 +30,11 @@ module Stweak
 
         # Authenticate with a username and raw password.
         #
-        # @param username [String]
+        # @param username [Username]
         # @param password [String]
         # @return [Hash{Symbol => Object}, nil] the projected account or nil
         sig do
-          params(username: String, password: String)
+          params(username: Username, password: String)
             .returns(T.nilable(T::Hash[Symbol, T.untyped]))
         end
         def call(username:, password:)
@@ -46,9 +47,9 @@ module Stweak
 
         private
 
-        sig { params(username: String).returns(T.nilable(T::Hash[Symbol, T.untyped])) }
+        sig { params(username: Username).returns(T.nilable(T::Hash[Symbol, T.untyped])) }
         def find_account(username)
-          @projection_store.read_all(table: :accounts).find { |account| account[:username] == username }
+          @projection_store.read_all(table: :accounts).find { |account| account[:username] == username.value }
         end
       end
     end

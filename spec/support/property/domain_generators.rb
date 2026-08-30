@@ -14,13 +14,7 @@ module DomainPropertyGenerators
     tuple(
       uuid, positive_integer, time, uuid,
       nonempty_string, nonempty_string, nonempty_string, nonempty_string
-    ).map do |(stream_id, sequence, occurred_at, account_id, username, password_hash, name, email)|
-      Stweak::Domain::Accounts::AccountCreated.new(
-        stream_id: Stweak::Domain::Accounts::AccountId.new(value: stream_id), sequence: sequence,
-        occurred_at: occurred_at, account_id: Stweak::Domain::Accounts::AccountId.new(value: account_id),
-        username: username, password_hash: password_hash, name: name, email: email
-      )
-    end
+    ).map { |fields| build_account_created_event(fields) }
   end
 
   # A valid CreateAccount command.
@@ -29,9 +23,24 @@ module DomainPropertyGenerators
       .map do |(account_id, username, password, name, email)|
         Stweak::Domain::Accounts::CreateAccount.new(
           account_id: Stweak::Domain::Accounts::AccountId.new(value: account_id),
-          username: username, password: password, name: name, email: email
+          username: Stweak::Domain::Accounts::Username.new(value: username), password: password,
+          name: Stweak::Domain::Accounts::DisplayName.new(value: name),
+          email: Stweak::Domain::Accounts::Email.new(value: email)
         )
       end
+  end
+
+  # Build an AccountCreated from raw tuple fields, wrapping each in its value
+  # object. Extracted so the generator above stays within method-length limits.
+  def build_account_created_event(fields)
+    stream_id, sequence, occurred_at, account_id, username, password_hash, name, email = fields
+    Stweak::Domain::Accounts::AccountCreated.new(
+      stream_id: Stweak::Domain::Accounts::AccountId.new(value: stream_id), sequence: sequence,
+      occurred_at: occurred_at, account_id: Stweak::Domain::Accounts::AccountId.new(value: account_id),
+      username: Stweak::Domain::Accounts::Username.new(value: username), password_hash: password_hash,
+      name: Stweak::Domain::Accounts::DisplayName.new(value: name),
+      email: Stweak::Domain::Accounts::Email.new(value: email)
+    )
   end
 
   # A list of events on one stream, with consecutive sequences starting at one.
