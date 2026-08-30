@@ -25,11 +25,11 @@ module App
           @store = store
         end
 
-        # @param username [String]
+        # @param username [Stweak::Domain::Accounts::Username]
         # @return [Boolean]
-        sig { override.params(username: String).returns(T::Boolean) }
+        sig { override.params(username: Stweak::Domain::Accounts::Username).returns(T::Boolean) }
         def include?(username)
-          @store.read_all(table: :accounts).any? { |row| row[:username] == username }
+          @store.read_all(table: :accounts).any? { |row| row[:username] == username.to_s }
         end
       end
     end

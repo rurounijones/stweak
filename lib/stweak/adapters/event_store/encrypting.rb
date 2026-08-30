@@ -208,7 +208,14 @@ module Stweak
 
         # Map each PII field name to the operation's result for that field's
         # value. The operation is passed as a callable rather than a block so
-        # Sorbet can type it without the block-parameter special case.
+        # Sorbet can type it without the block-parameter special case. Each
+        # field value is rendered to its stored form first: a PII field may be a
+        # domain value object (a display name, an email) rather than a bare
+        # String, and the cipher works on the string it carries. The stored form
+        # is used rather than +to_s+ precisely because these value objects mask
+        # themselves when rendered as a string — the real value the cipher must
+        # act on is reachable only through +to_stored+ (on encrypt the plaintext,
+        # on decrypt the stored ciphertext).
         #
         # @param event [Stweak::Domain::Event]
         # @param fields [Array<Symbol>]
@@ -224,7 +231,7 @@ module Stweak
         def transform(event, fields, operation)
           attributes = T.let({}, T::Hash[String, String])
           fields.each do |field|
-            attributes[field.to_s] = operation.call(event.public_send(field))
+            attributes[field.to_s] = operation.call(event.public_send(field).to_stored)
           end
           attributes
         end

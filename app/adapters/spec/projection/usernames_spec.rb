@@ -24,15 +24,15 @@ RSpec.describe App::Adapters::Projection::Usernames do
 
   it 'sees a username once an account row carries it' do
     store.upsert(table: :accounts, attributes: account('alice'))
-    expect(usernames.include?('alice')).to be(true)
+    expect(usernames.include?(Stweak::Domain::Accounts::Username.new(value: 'alice'))).to be(true)
   end
 
   it 'does not see an unused username' do
     store.upsert(table: :accounts, attributes: account('alice'))
-    expect(usernames.include?('bob')).to be(false)
+    expect(usernames.include?(Stweak::Domain::Accounts::Username.new(value: 'bob'))).to be(false)
   end
 
   it 'sees no usernames when the table is empty' do
-    expect(usernames.include?('alice')).to be(false)
+    expect(usernames.include?(Stweak::Domain::Accounts::Username.new(value: 'alice'))).to be(false)
   end
 end

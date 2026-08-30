@@ -13,7 +13,9 @@ OCCURRED_AT = Time.utc(2026, 1, 2, 3, 4, 5)
 def created_event(username: 'alice', name: 'Alice', email: 'alice@example.com')
   Stweak::Domain::Accounts::AccountCreated.new(
     stream_id: ACCOUNT_ID, sequence: 1, occurred_at: OCCURRED_AT,
-    account_id: ACCOUNT_ID, username: username, password_hash: 'hash', name: name, email: email
+    account_id: ACCOUNT_ID, username: Stweak::Domain::Accounts::Username.new(value: username),
+    password_hash: 'hash', name: Stweak::Domain::Accounts::DisplayName.new(value: name),
+    email: Stweak::Domain::Accounts::Email.new(value: email)
   )
 end
 

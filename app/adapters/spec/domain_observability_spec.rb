@@ -110,7 +110,9 @@ RSpec.describe App::Observability::Domain do
   end
   let(:command) do
     Stweak::Domain::Accounts::CreateAccount.new(
-      account_id: account_id, username: 'alice', password: 'secret', name: 'Alice', email: 'alice@example.com'
+      account_id: account_id, username: Stweak::Domain::Accounts::Username.new(value: 'alice'),
+      password: 'secret', name: Stweak::Domain::Accounts::DisplayName.new(value: 'Alice'),
+      email: Stweak::Domain::Accounts::Email.new(value: 'alice@example.com')
     )
   end
   let(:event_store) { DomainObservabilityDoubles::EventStore.new }
@@ -162,7 +164,10 @@ RSpec.describe App::Observability::Domain do
 
   it 'traces aggregate replay with and without a checkpoint' do
     checkpoint = Stweak::Domain::Checkpoint.new(
-      state: { 'created' => false, 'username' => '', 'password_hash' => '', 'name' => '', 'email' => '' }, version: 4
+      state: {
+        'created' => false, 'username' => 'alice', 'password_hash' => 'hash',
+        'name' => 'Alice', 'email' => 'alice@example.com'
+      }, version: 4
     )
     Stweak::Domain::Accounts::Account.replay(id: account_id, events: [])
     Stweak::Domain::Accounts::Account.replay(id: account_id, events: [], checkpoint: checkpoint)
