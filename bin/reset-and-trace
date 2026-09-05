@@ -3,9 +3,19 @@
 
 require 'fileutils'
 
+# Reset the complete demo stack, then run the continuous lifecycle trace.
+# Usage: reset-and-trace [threads] (Ctrl-C to stop).
+
 COMPOSE = ['docker', 'compose', '-f', '.devcontainer/docker-compose.yml'].freeze
+begin
+  THREADS = Integer(ARGV.fetch(0, '3'))
+rescue ArgumentError
+  abort 'thread count must be an integer'
+end
+abort 'thread count must be positive' unless THREADS.positive?
 DATA_DIR = '/tmp/openobserve_data'
 
+# Run a command and stop on failure.
 def run(*command)
   puts "+ #{command.join(' ')}"
   abort "command failed: #{command.join(' ')}" unless system(*command)
@@ -22,27 +32,75 @@ until system('curl', '-fsS', 'http://localhost:5080/', out: File::NULL, err: Fil
 end
 puts ' ready'
 
-run(*COMPOSE, 'exec', 'dev', 'bash', '-lc', <<~'SHELL')
+run(*COMPOSE, 'exec', 'dev', 'bash', '-lc', <<~SHELL)
   set -e
-  # The drivers share one .env; reset it from the example and enable tracing.
   cd /workspaces/stweak/app/drivers
   cp .env.example .env
   sed -i \
-    -e 's|^# OTEL_SEMCONV_STABILITY_OPT_IN=database|OTEL_SEMCONV_STABILITY_OPT_IN=database/dup|' \
+    -e 's|^# OTEL_SEMCONV_STABILITY_OPT_IN=.*|OTEL_SEMCONV_STABILITY_OPT_IN=database/dup|' \
     -e 's|^# OTEL_EXPORTER_OTLP_ENDPOINT=.*|OTEL_EXPORTER_OTLP_ENDPOINT=http://openobserve:5080/api/default|' \
     -e 's|^# OTEL_EXPORTER_OTLP_HEADERS=.*|OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic%20cm9vdEBleGFtcGxlLmNvbTpSb290MTIzIQ==|' \
     .env
 
-  cd /workspaces/stweak/app/drivers/data_generator
+  # Reset persistent event and read-side state named by the shared .env.
+  table=$(grep '^STWEAK_STREAMS_TABLE=' .env | cut -d= -f2-)
+  queue=$(grep '^STWEAK_QUEUE=' .env | cut -d= -f2-)
+  db=/workspaces/stweak/stweak.db
+  sed -i "s|^STWEAK_DB=.*|STWEAK_DB=$db|; s|^AWS_ENDPOINT_URL=.*|AWS_ENDPOINT_URL=http://dynamodb-local:8000|; s|^ELASTICMQ_URL=.*|ELASTICMQ_URL=http://elasticmq:9324|; s|^REDIS_URL=.*|REDIS_URL=redis://redis:6379|" .env
+  # Compose injects these variables when the dev container is created; export
+  # the service endpoints explicitly so an older container environment cannot
+  # override the values just written to the shared .env.
+  export AWS_ENDPOINT_URL=http://dynamodb-local:8000
+  export ELASTICMQ_URL=http://elasticmq:9324
+  export REDIS_URL=redis://redis:6379
+
+  cd /workspaces/stweak/app/adapters
+  echo "Resetting DynamoDB table $table, Redis, SQLite $db, and queue $queue"
   bundle install >/dev/null
-  bundle exec bin/stweak-generate 3
+  bundle exec ruby -raws-sdk-dynamodb -rredis -raws-sdk-sqs -ruri -e '
+    dynamo = Aws::DynamoDB::Client.new(endpoint: "http://dynamodb-local:8000", region: "us-east-1", credentials: Aws::Credentials.new("dummy", "dummy"))
+    sqs = Aws::SQS::Client.new(endpoint: "http://elasticmq:9324", region: "us-east-1", credentials: Aws::Credentials.new("dummy", "dummy"))
+
+    def queue_url_for(sqs, queue_name)
+      url = URI.parse(sqs.get_queue_url(queue_name: queue_name).queue_url)
+      endpoint = URI.parse(sqs.config.endpoint)
+      url.scheme = endpoint.scheme
+      url.host = endpoint.host
+      url.port = endpoint.port
+      url.to_s
+    end
+
+    queue_name = ARGV.fetch(1)
+    begin
+      dynamo.delete_table(table_name: ARGV.fetch(0))
+    rescue Aws::DynamoDB::Errors::ResourceNotFoundException
+      nil
+    end
+    Redis.new(url: "redis://redis:6379").flushdb
+    begin
+      sqs.purge_queue(queue_url: queue_url_for(sqs, queue_name))
+    rescue Aws::SQS::Errors::QueueDoesNotExist
+      nil
+    rescue Seahorse::Client::NetworkingError => error
+      abort "ElasticMQ reset failed: \#{error.message}; ensure the elasticmq service is running"
+    end
+  ' "$table" "$queue"
+
+  case "$db" in
+    :memory:) ;;
+    *) rm -f -- "$db" ;;
+  esac
 
   cd /workspaces/stweak/app/drivers/web_admin
   bundle install >/dev/null
   bundle exec bin/web-admin >/tmp/web-admin.log 2>&1 &
   server=$!
   trap 'kill "$server" 2>/dev/null || true' EXIT
-  sleep 3
-  curl -fsS http://localhost:4567/ >/dev/null
-  echo 'Web admin smoke test passed'
+  until curl -fsS http://127.0.0.1:4567/ >/dev/null; do sleep 1; done
+
+  cd /workspaces/stweak/app/drivers/data_generator
+  bundle install >/dev/null
+  bundle exec bin/stweak-generate #{THREADS} --check-web-admin
 SHELL
+
+puts 'Trace generation stopped'

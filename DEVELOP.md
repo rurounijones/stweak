@@ -85,20 +85,33 @@ drivers, never the specs or the app-area adapters.
 
 To turn it on, uncomment the three `OTEL_*` lines in the shared
 `app/drivers/.env` (see `.env.example`); an unset `OTEL_EXPORTER_OTLP_ENDPOINT`
-disables tracing entirely, so a plain run and the test suites never export. Each
-driver auto-instruments its libraries through `opentelemetry-instrumentation-all`,
-so spans appear for the Sinatra routes (web admin), the AWS SDK calls (the
-DynamoDB event store and the SQS subscription), and Redis (the key and
-checkpoint stores). SQLite has no published instrumentation gem, so the app
-carries its own (`app/adapters/observability/sqlite_instrumentation.rb`),
-registered the same way and installed by the same `use_all`; projection-store
-queries therefore appear as client spans too. Application-side wrappers in
+disables tracing entirely, so a plain run and the test suites never export.
+
+`bin/generate-traces [threads]` runs the data generator continuously until
+Ctrl-C or TERM. `bin/reset-and-trace [threads]` resets the OpenObserve, DynamoDB,
+Redis, SQLite, and ElasticMQ demo state first, then starts the same workflow.
+Each worker creates a fresh account, disables it, then deletes it — exercising
+`AccountCreated`, `AccountDisabled` and `AccountDeleted` in turn — with a 1–5
+second gap between actions so one account's lifecycle reads as a sequence on the
+trace timeline. The generator also starts a separate web-admin checker thread
+that requests `/` every 5–7 seconds, keeping the read side in the traces
+alongside the writes. The default is three lifecycle workers; pass a positive
+integer to change it.
+
+Each driver auto-instruments its libraries through
+`opentelemetry-instrumentation-all`, so spans appear for the Sinatra routes (web
+admin), the AWS SDK calls (the DynamoDB event store and the SQS subscription),
+and Redis (the key and checkpoint stores). SQLite has no published
+instrumentation gem, so the app carries its own
+(`app/adapters/observability/sqlite_instrumentation.rb`), registered the same
+way and installed by the same `use_all`; projection-store queries therefore
+appear as client spans too. Application-side wrappers in
 `app/observability/domain.rb` prepend spans onto the domain handler, aggregate,
 and projection system without adding telemetry dependencies to `lib/`. The
-useful domain spans include `domain.account.create`,
-`domain.account.apply_create`, `domain.aggregate.replay`, and
-`domain.projection.on_events_appended`; they nest beneath the driver operation
-that invoked them.
+useful domain spans include `domain.account.create`, `domain.account.disable`,
+`domain.account.delete`, their `domain.account.apply_*` siblings,
+`domain.aggregate.replay`, and `domain.projection.on_events_appended`; they nest
+beneath the driver operation that invoked them.
 
 Parallel wrappers in `app/observability/adapters.rb` do the same for the
 app-area adapters, so each AWS SDK client call has a semantically-named parent
@@ -109,14 +122,18 @@ store gains `eventstore.append`, `eventstore.read_stream`,
 the boot-time `subscription.ensure_queue`. The subscription's poller-thread
 spans (`event_subscription.poll` and `event_subscription.deliver`) stay inline
 in the adapter, because their cross-thread trace-context propagation cannot be
-added from outside. The data generator adds one span of its own per account it
-creates, which becomes the parent of the domain and store spans that account
-produced. Projection row writes and cursor advances share one SQLite
-transaction, so their SQL spans appear between one `BEGIN` and `COMMIT`.
-Because the projection is fed asynchronously through the subscription's queue,
-the generator drains it before exiting, so every account's `deliver` and
-projection spans are recorded rather than lost when the short-lived process
-ends mid-delivery.
+added from outside. The data generator adds one span of its own per lifecycle
+action (`data_generator.create_account`, `data_generator.disable_account`,
+`data_generator.delete_account`) and per web-admin check
+(`data_generator.web_admin_check`), each becoming the parent of the domain and
+store spans that action produced; the checker's Net::HTTP client span nests
+beneath the check span, and its propagated trace context parents the web
+admin's route span in the other process. Projection row writes and cursor
+advances share one SQLite transaction, so their SQL spans appear between one
+`BEGIN` and `COMMIT`. Because the projection is fed asynchronously through the
+subscription's queue, the generator drains it before exiting, so every event's
+`deliver` and projection spans are recorded rather than lost when the
+short-lived process ends mid-delivery.
 
 The wrappers attach only operation metadata (class names, identifiers, counts,
 and projection names); names, email addresses, and passwords are never added to

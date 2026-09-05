@@ -1,10 +1,11 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Generate plausible account-creation events in volume. Adapter selection and
-# connection settings come from the shared drivers .env (see
-# ../../.env.example); dotenv only populates ENV, which the wiring reads with
-# ENV.fetch. Usage: stweak-generate [count]
+# Generate a continuous account lifecycle trace: each worker creates an
+# account, disables it, then deletes it, and repeats until Ctrl-C or TERM.
+# Adapter selection and connection settings come from the shared drivers .env
+# (see ../../.env.example); dotenv only populates ENV, which the wiring reads
+# with ENV.fetch. Usage: stweak-generate [threads] [--check-web-admin]
 
 require 'dotenv'
 Dotenv.load(File.expand_path('../../.env', __dir__))
@@ -12,19 +13,18 @@ Dotenv.load(File.expand_path('../../.env', __dir__))
 # Enable OpenTelemetry tracing only when an OTLP endpoint is configured (in the
 # shared .env). Unset means no exporter and no connection attempts, so the
 # generator runs identically with tracing off. use_all auto-instruments the AWS
-# SDK (DynamoDB, SQS) and Redis; the generator also emits its own span per
-# command (see Generator#run).
+# SDK (DynamoDB, SQS), Redis, and — for the web-admin checker — Net::HTTP.
+# Net::HTTP must be loaded before configure so use_all's net_http
+# instrumentation registers its middleware ahead of the checker's requests,
+# the same ordering the Redis and Sinatra comments in the other bundles rely
+# on.
 tracing = !ENV.fetch('OTEL_EXPORTER_OTLP_ENDPOINT', '').empty?
 if tracing
   require 'opentelemetry/sdk'
   require 'opentelemetry/exporter/otlp'
   require 'opentelemetry/instrumentation/all'
-  # Load redis before configure so use_all's Redis instrumentation detects
-  # RedisClient (redis 5+ does its I/O through it) and registers its middleware;
-  # loaded later, in the wiring, it would install after use_all has run and the
-  # key- and checkpoint-store calls would go untraced. Same ordering the Sinatra
-  # note in web_admin's config.ru relies on.
   require 'redis'
+  require 'net/http'
   # Register app instrumentation before use_all, so it installs alongside the
   # off-the-shelf libraries (SQLite has no published gem of its own).
   require_relative '../../../adapters/observability/sqlite_instrumentation'
@@ -45,7 +45,9 @@ end
 
 require_relative '../lib/wiring'
 
-count = Integer(ARGV.fetch(0, '100'))
+check_web_admin = ARGV.delete('--check-web-admin')
+thread_count = Integer(ARGV.fetch(0, DataGenerator::LifecycleGenerator::DEFAULT_THREADS.to_s))
+raise ArgumentError, 'thread count must be positive' unless thread_count.positive?
 
 # Wiring constructs the stores, which create their DynamoDB tables and SQS queue
 # on first use. Those setup calls happen before any command span, so wrap them
@@ -59,16 +61,28 @@ built =
   else
     build.call
   end
-accounts = built.generator.run(count)
-puts "Created #{accounts.length} accounts"
 
-# The subscription delivers to the projections asynchronously through its
-# transport, so this short-lived process would otherwise exit with the tail-end
-# events still unconsumed — their projection work never done and, with tracing
-# on, their spans never recorded. Drain so the read side catches up first. The
-# in-memory subscription delivers synchronously and has nothing to drain.
-built.subscription.drain if built.subscription.respond_to?(:drain)
+# A signal asks the workers to stop where they are; the ensure block below then
+# drains the read side and flushes the traces before the process exits.
+stop = proc { built.lifecycle_generator.stop }
+Signal.trap('INT', &stop)
+Signal.trap('TERM', &stop)
 
-# Flush the batch span processor before this short-lived process exits, so the
-# last spans are not dropped.
-OpenTelemetry.tracer_provider.shutdown if tracing
+begin
+  built.lifecycle_generator.run(
+    thread_count: thread_count, check_web_admin: !check_web_admin.nil?
+  )
+ensure
+  built.lifecycle_generator.stop
+  # The subscription delivers to the projections asynchronously through its
+  # transport, so without draining the process would exit with the tail-end
+  # events still unconsumed — their projection work never done and, with
+  # tracing on, their spans never recorded. The in-memory subscription
+  # delivers synchronously and has nothing to drain.
+  built.subscription.drain if built.subscription.respond_to?(:drain)
+  # Flush the batch span processor before this short-lived process exits, so
+  # the last spans are not dropped.
+  OpenTelemetry.tracer_provider.shutdown if tracing
+end
+
+puts "Stopped #{thread_count} lifecycle worker(s)"

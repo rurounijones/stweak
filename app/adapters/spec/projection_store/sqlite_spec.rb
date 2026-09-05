@@ -1,6 +1,7 @@
 # typed: false
 # frozen_string_literal: true
 
+require 'fileutils'
 require 'sqlite3'
 require 'tmpdir'
 require_relative '../spec_helper'
@@ -20,6 +21,10 @@ RSpec.describe App::Adapters::SqliteProjectionStore do
     { account_id: '1', username: 'alice', disabled: 0, password_hash: 'h', name_cipher: 'n',
       email_cipher: 'e', created_at: 't' }
   end
+
+  # Remove the file this spec leaves in the tmp dir, or one run's stale
+  # schema can collide with a later run's object_id and reopen an old table.
+  after { FileUtils.rm_f(path) }
 
   it_behaves_like 'a projection store'
 

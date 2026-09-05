@@ -1,17 +1,24 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+# Generate a continuous lifecycle trace and exercise the web admin concurrently.
+# Usage: generate-traces [threads] (Ctrl-C to stop).
+
 COMPOSE = ['docker', 'compose', '-f', '.devcontainer/docker-compose.yml'].freeze
+begin
+  THREADS = Integer(ARGV.fetch(0, '3'))
+rescue ArgumentError
+  abort 'thread count must be an integer'
+end
+abort 'thread count must be positive' unless THREADS.positive?
 
 def run(*command)
   puts "+ #{command.join(' ')}"
   abort "command failed: #{command.join(' ')}" unless system(*command)
 end
 
-run(*COMPOSE, 'exec', 'dev', 'bash', '-lc', <<~'SHELL')
+run(*COMPOSE, 'exec', 'dev', 'bash', '-lc', <<~SHELL)
   set -e
-  # The drivers share one .env; enable tracing in it, creating it from the
-  # example on first run.
   cd /workspaces/stweak/app/drivers
   test -f .env || cp .env.example .env
   sed -i \
@@ -19,16 +26,16 @@ run(*COMPOSE, 'exec', 'dev', 'bash', '-lc', <<~'SHELL')
     -e 's|^# OTEL_EXPORTER_OTLP_HEADERS=.*|OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic%20cm9vdEBleGFtcGxlLmNvbTpSb290MTIzIQ==|' \
     .env
 
-  cd /workspaces/stweak/app/drivers/data_generator
-  bundle install >/dev/null
-  bundle exec bin/stweak-generate 3
-
   cd /workspaces/stweak/app/drivers/web_admin
   bundle install >/dev/null
   bundle exec bin/web-admin >/tmp/web-admin.log 2>&1 &
   server=$!
   trap 'kill "$server" 2>/dev/null || true' EXIT
   sleep 3
-  curl --fail --silent --show-error http://localhost:4567/ >/dev/null
-  echo 'Web admin request completed'
+
+  cd /workspaces/stweak/app/drivers/data_generator
+  bundle install >/dev/null
+  bundle exec bin/stweak-generate #{THREADS} --check-web-admin
 SHELL
+
+puts 'Trace generation stopped'

@@ -4,6 +4,7 @@
 # These doubles deliberately share one file: they are private fixtures for the
 # instrumentation contract, not production collaborators.
 # rubocop:disable Style/Documentation
+# rubocop:disable Lint/UnusedBlockArgument
 # rubocop:disable Lint/UnusedMethodArgument
 # rubocop:disable RSpec/MultipleMemoizedHelpers
 # rubocop:disable RSpec/ExampleLength
@@ -127,6 +128,17 @@ RSpec.describe App::Observability::Domain do
     )
   end
 
+  # The created event a disable or delete handler replays, so the aggregate
+  # comes back created and the lifecycle transition can proceed.
+  let(:created_event) do
+    Stweak::Domain::Accounts::AccountCreated.new(
+      stream_id: account_id, sequence: 1, occurred_at: Time.now,
+      account_id: account_id, username: Stweak::Domain::Accounts::Username.new(value: 'alice'),
+      password_hash: 'hash', name: Stweak::Domain::Accounts::DisplayName.new(value: 'Alice'),
+      email: Stweak::Domain::Accounts::Email.new(value: 'alice@example.com')
+    )
+  end
+
   before do
     allow(OpenTelemetry).to receive(:tracer_provider).and_return(provider)
     described_class.install
@@ -137,8 +149,17 @@ RSpec.describe App::Observability::Domain do
 
     aggregate_failures do
       expect(Stweak::Domain::Accounts::Account.ancestors.count(App::Observability::Domain::AccountTracing)).to eq(1)
+      expect(Stweak::Domain::Accounts::Account.ancestors.count(
+               App::Observability::Domain::LifecycleAccountTracing
+             )).to eq(1)
       expect(Stweak::Domain::Accounts::CreateAccountHandler.ancestors.count(
                App::Observability::Domain::CreateAccountHandlerTracing
+             )).to eq(1)
+      expect(Stweak::Domain::Accounts::DisableAccountHandler.ancestors.count(
+               App::Observability::Domain::LifecycleHandlerTracing
+             )).to eq(1)
+      expect(Stweak::Domain::Accounts::DeleteAccountHandler.ancestors.count(
+               App::Observability::Domain::LifecycleHandlerTracing
              )).to eq(1)
       expect(Stweak::Domain::ProjectionSystem.ancestors.count(App::Observability::Domain::ProjectionSystemTracing))
         .to eq(1)
@@ -157,6 +178,50 @@ RSpec.describe App::Observability::Domain do
       )
       expect(tracer.spans.find { |span| span[:name] == 'domain.account.create' }[:attributes]).to include(
         'stweak.command' => 'Stweak::Domain::Accounts::CreateAccount',
+        'stweak.account_id' => account_id.to_s
+      )
+    end
+  end
+
+  it 'traces account disable through the handler, replay, and aggregate' do
+    event_store.define_singleton_method(:read_stream) do |owner_type:, stream_id:, after: 0|
+      [created_event]
+    end
+    disable_handler = Stweak::Domain::Accounts::DisableAccountHandler.new(
+      event_store: event_store, checkpoint_store: checkpoint_store
+    )
+
+    result = disable_handler.handle(Stweak::Domain::Accounts::DisableAccount.new(account_id: account_id))
+
+    aggregate_failures do
+      expect(result.disabled).to be(true)
+      expect(tracer.spans.map { |span| span[:name] }).to include(
+        'domain.account.disable', 'domain.aggregate.replay', 'domain.account.apply_disable'
+      )
+      expect(tracer.spans.find { |span| span[:name] == 'domain.account.disable' }[:attributes]).to include(
+        'stweak.command' => 'Stweak::Domain::Accounts::DisableAccount',
+        'stweak.account_id' => account_id.to_s
+      )
+    end
+  end
+
+  it 'traces account delete through the handler, replay, and aggregate' do
+    event_store.define_singleton_method(:read_stream) do |owner_type:, stream_id:, after: 0|
+      [created_event]
+    end
+    delete_handler = Stweak::Domain::Accounts::DeleteAccountHandler.new(
+      event_store: event_store, checkpoint_store: checkpoint_store
+    )
+
+    result = delete_handler.handle(Stweak::Domain::Accounts::DeleteAccount.new(account_id: account_id))
+
+    aggregate_failures do
+      expect(result.deleted).to be(true)
+      expect(tracer.spans.map { |span| span[:name] }).to include(
+        'domain.account.delete', 'domain.aggregate.replay', 'domain.account.apply_delete'
+      )
+      expect(tracer.spans.find { |span| span[:name] == 'domain.account.delete' }[:attributes]).to include(
+        'stweak.command' => 'Stweak::Domain::Accounts::DeleteAccount',
         'stweak.account_id' => account_id.to_s
       )
     end
@@ -203,6 +268,7 @@ RSpec.describe App::Observability::Domain do
 end
 
 # rubocop:enable Style/Documentation
+# rubocop:enable Lint/UnusedBlockArgument
 # rubocop:enable Lint/UnusedMethodArgument
 # rubocop:enable RSpec/MultipleMemoizedHelpers
 # rubocop:enable RSpec/ExampleLength

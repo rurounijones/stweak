@@ -25,6 +25,7 @@ require_relative '../../../../lib/stweak/adapters/checkpoint_store/in_memory'
 require_relative '../../../../lib/stweak/adapters/event_subscription/in_memory'
 require_relative '../../../../lib/stweak/adapters/encryption/aes_gcm'
 require_relative 'data_generator'
+require_relative 'lifecycle_generator'
 
 module DataGenerator
   # The composition root: it reads the adapter selection from the environment
@@ -46,24 +47,31 @@ module DataGenerator
     # Raised when a selector names an adapter that does not exist.
     class UnknownAdapter < StandardError; end
 
-    # The assembled system a caller drives: the generator, plus the
-    # subscription so a short-lived caller can drain the read side before it
-    # exits. Delivery to the projections is asynchronous through the
-    # subscription's transport, so without draining a run can exit with events
-    # still unconsumed — their projection work never done and, with tracing on,
-    # their spans never recorded.
+    # The assembled system a caller drives: the bounded create-only generator,
+    # the continuous lifecycle generator, plus the subscription so a
+    # short-lived caller can drain the read side before it exits. Delivery to
+    # the projections is asynchronous through the subscription's transport, so
+    # without draining a run can exit with events still unconsumed — their
+    # projection work never done and, with tracing on, their spans never
+    # recorded.
     class Built < T::Struct
       const :generator, DataGenerator::Generator
+      const :lifecycle_generator, DataGenerator::LifecycleGenerator
       const :subscription, Stweak::Ports::EventSubscription
     end
 
-    # Build the generator over the selected adapters. The one key store is
+    # Build the generators over the selected adapters. The one key store is
     # shared by every encrypting decorator — event store, projection store and
     # checkpoint store alike — so a single key decrypts a person's data
-    # everywhere, and one shred erases it everywhere. Returns the generator
+    # everywhere, and one shred erases it everywhere. Returns the generators
     # paired with the subscription so the caller can drain the read side.
     #
+    # The method assembles every handler and store into one composite; a
+    # reader follows that wiring top to bottom, so it deliberately exceeds the
+    # default size and branch budgets rather than split the narrative.
     # @return [DataGenerator::Wiring::Built]
+    # rubocop:disable Metrics/AbcSize
+    # rubocop:disable Metrics/MethodLength
     sig { returns(Built) }
     def self.build
       key_store = build_key_store
@@ -73,9 +81,21 @@ module DataGenerator
       projection_store = build_projection_store(key_store, raw_projection)
       register_projection(event_store, projection_store, subscription)
       handler = build_handler(event_store, raw_projection, key_store)
+      checkpoint_store = build_checkpoint_store(key_store)
+      disable_handler = Stweak::Domain::Accounts::DisableAccountHandler.new(
+        event_store: event_store, checkpoint_store: checkpoint_store
+      )
+      delete_handler = Stweak::Domain::Accounts::DeleteAccountHandler.new(
+        event_store: event_store, checkpoint_store: checkpoint_store
+      )
       generator = DataGenerator::Generator.new(handler: handler, event_store: event_store)
-      Built.new(generator: generator, subscription: subscription)
+      lifecycle_generator = DataGenerator::LifecycleGenerator.new(
+        create_handler: handler, disable_handler: disable_handler, delete_handler: delete_handler
+      )
+      Built.new(generator: generator, lifecycle_generator: lifecycle_generator, subscription: subscription)
     end
+    # rubocop:enable Metrics/AbcSize
+    # rubocop:enable Metrics/MethodLength
 
     # The write-side command handler: it hashes through bcrypt, checkpoints to
     # the selected checkpoint store, and enforces username uniqueness against
