@@ -163,7 +163,7 @@ module Stweak
         end
         private_class_method def self.display_name_from(value)
           case value
-          when String then DisplayName.new(value: value)
+          when String then DisplayName.from_stored(value)
           else value
           end
         end
@@ -177,7 +177,7 @@ module Stweak
         end
         private_class_method def self.email_from(value)
           case value
-          when String then Email.new(value: value)
+          when String then Email.from_stored(value)
           else value
           end
         end

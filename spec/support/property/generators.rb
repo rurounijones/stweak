@@ -24,6 +24,13 @@ module PropertyGenerators
     string(min: 1)
   end
 
+  # One character drawn from the given set, for building strings over a fixed
+  # alphabet (a valid username, email or display name) rather than the arbitrary
+  # code points +string+ would produce.
+  def char_from(set)
+    choose(0...set.size).map { |index| set.fetch(index) }
+  end
+
   # A 32-byte AES-256 key.
   def aes_key
     array(choose(0..255), min: 32, max: 32).map { |bytes| bytes.pack('C*') }

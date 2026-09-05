@@ -111,6 +111,12 @@ RSpec.describe WebAdmin::Reader do
     expect(reader.authenticate(username: '', password: 'hunter2')).to be_nil
   end
 
+  it 'rejects a malformed username without asking the domain' do
+    seed.call(username: 'ada', name: 'Ada', email: 'ada@example.com')
+
+    expect(reader.authenticate(username: 'a d a', password: 'hunter2')).to be_nil
+  end
+
   it 'reads the events on an account stream, decrypted' do
     id = seed.call(username: 'ada', name: 'Ada', email: 'ada@example.com')
 

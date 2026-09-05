@@ -25,11 +25,22 @@ module DataGenerator
     def self.random_create
       Stweak::Domain::Accounts::CreateAccount.new(
         account_id: Stweak::Domain::Accounts::AccountId.new(value: SecureRandom.uuid),
-        username: Stweak::Domain::Accounts::Username.new(value: Faker::Internet.unique.username),
+        username: Stweak::Domain::Accounts::Username.new(value: random_username),
         password: Faker::Internet.password(min_length: 10, max_length: 20),
         name: Stweak::Domain::Accounts::DisplayName.new(value: Faker::Name.name),
         email: Stweak::Domain::Accounts::Email.new(value: Faker::Internet.unique.email)
       )
+    end
+
+    # A per-process-unique username in the shape Username accepts: Faker's handle
+    # with its separators (dots and the like) folded to underscores and clamped
+    # to the 3-to-30-character window the value object requires.
+    #
+    # @return [String]
+    sig { returns(String) }
+    def self.random_username
+      handle = Faker::Internet.unique.username(specifier: 3..30).gsub(/[^A-Za-z0-9_-]/, '_')
+      handle[0, 30]
     end
 
     # The command to disable an account, continuing the lifecycle a create

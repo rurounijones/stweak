@@ -17,9 +17,48 @@ RSpec.describe Stweak::Domain::Accounts::Username do
     expect(username.to_s).to eq('ada')
   end
 
+  it 'accepts letters, digits, underscore and hyphen' do
+    expect(described_class.new(value: 'Ada_99-x').value).to eq('Ada_99-x')
+  end
+
+  it 'accepts the shortest and longest allowed lengths' do
+    expect([described_class.new(value: 'abc').value, described_class.new(value: 'a' * 30).value])
+      .to eq(['abc', 'a' * 30])
+  end
+
   it 'rejects an empty value' do
     expect { described_class.new(value: '') }
-      .to raise_error(Stweak::Domain::ValidationError, /username must not be empty/)
+      .to raise_error(Stweak::Domain::ValidationError, /3 to 30 characters/)
+  end
+
+  it 'rejects a value shorter than three characters' do
+    expect { described_class.new(value: 'ab') }
+      .to raise_error(Stweak::Domain::ValidationError, /3 to 30 characters/)
+  end
+
+  it 'rejects a value longer than thirty characters' do
+    expect { described_class.new(value: 'a' * 31) }
+      .to raise_error(Stweak::Domain::ValidationError, /3 to 30 characters/)
+  end
+
+  it 'rejects whitespace' do
+    expect { described_class.new(value: 'ad a') }
+      .to raise_error(Stweak::Domain::ValidationError, /letters, digits/)
+  end
+
+  it 'rejects punctuation outside underscore and hyphen' do
+    expect { described_class.new(value: 'ada.b') }
+      .to raise_error(Stweak::Domain::ValidationError, /letters, digits/)
+  end
+
+  it 'names the bad value in the rejection, since a username is not personal data' do
+    expect { described_class.new(value: 'ad a') }
+      .to raise_error(Stweak::Domain::ValidationError, /"ad a"/)
+  end
+
+  it 'rejects a value that is not valid UTF-8' do
+    expect { described_class.new(value: "abc\xFF") }
+      .to raise_error(Stweak::Domain::ValidationError, /letters, digits/)
   end
 
   it 'is equal to a username with the same value' do

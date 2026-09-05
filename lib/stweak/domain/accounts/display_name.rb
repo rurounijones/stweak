@@ -10,8 +10,18 @@ module Stweak
       # An account's display name: the name shown for the account, personal
       # data encrypted at rest, and the target of a forced rename. A named type
       # rather than a bare String, so a signature that asks for a display name
-      # cannot be handed a username or an email by mistake. Validated non-empty
-      # at construction; deeper rules on an acceptable name are a later concern.
+      # cannot be handed a username or an email by mistake.
+      #
+      # Validated for shape at construction, so an unusable name can never
+      # circulate: it must be no more than {MAX_LENGTH} characters, hold at
+      # least one non-whitespace character, and contain no control characters.
+      # The rules are deliberately looser than a username's because a display
+      # name is human-facing text: it may hold spaces, punctuation and non-ASCII
+      # letters, so only the length cap, the all-blank name and control
+      # characters (which have no place in shown text and are a classic
+      # injection vector) are refused. The rejection message never quotes the
+      # value: a display name is personal data, and naming it in an error would
+      # be exactly the leak {#to_s} guards against.
       #
       # Equality is by value: two display names are equal when they are exactly
       # the same class carrying the same string. It carries no shared base with
@@ -31,13 +41,57 @@ module Stweak
         # What the string-rendering operations return in place of the name.
         MASK = '*****'
 
-        # @param value [String] the display name, which must not be empty
-        # @raise [Stweak::Domain::ValidationError] if value is empty
+        # The longest a display name may be, in characters.
+        MAX_LENGTH = 50
+
+        # Matches a string that contains a control character, which a display
+        # name may not.
+        CONTROL = /[[:cntrl:]]/
+
+        # Matches a string that holds at least one non-whitespace character,
+        # which a display name must. Preferred over stripping and testing for
+        # empty: an all-whitespace string is empty whether stripped on one side
+        # or both, so the strip form leaves left/right-strip mutants that no
+        # test can kill, while this asks the question directly.
+        NON_BLANK = /\S/
+
+        # @param value [String] the display name: at most {MAX_LENGTH}
+        #   characters, not all whitespace, and free of control characters
+        # @raise [Stweak::Domain::ValidationError] if value breaks any of those
+        #   rules
         sig { params(value: String).void }
         def initialize(value:)
-          raise ValidationError, 'name must not be empty' if value.empty?
+          # `valid_encoding?` short-circuits the rest: on a non-UTF-8 string,
+          # `match?` itself raises ArgumentError rather than returning false.
+          # The value is not quoted in the message — a display name is personal
+          # data.
+          valid = value.valid_encoding? && value.match?(NON_BLANK) &&
+                  value.length <= MAX_LENGTH && !value.match?(CONTROL)
+          unless valid
+            raise ValidationError,
+                  "name must be at most #{MAX_LENGTH} characters, not blank, " \
+                  'and free of control characters'
+          end
 
           @value = value
+        end
+
+        # Rebuild from a value already taken from the store, which is trusted
+        # and so is wrapped without re-validating. The value came from the event
+        # log, and at the encrypting store's boundary it is ciphertext rather
+        # than a well-formed name, so re-checking its shape would be both wrong
+        # and impossible. This is the read-back counterpart to {#initialize},
+        # which validates a name arriving from outside the domain; the split is
+        # why encryption can round-trip an event through {AccountCreated.from_h}
+        # without the format rule rejecting the ciphertext.
+        #
+        # @param value [String] the stored value, trusted as-is
+        # @return [DisplayName]
+        sig { params(value: String).returns(DisplayName) }
+        def self.from_stored(value)
+          name = allocate
+          name.instance_variable_set(:@value, value)
+          name
         end
 
         # The real display name. Named for what it is: reading it is handling

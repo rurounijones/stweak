@@ -64,11 +64,13 @@ def build_create_account_command(account_id:, username: 'alice', password: 'hunt
 end
 
 # The username is derived from the account id, so commands generated for the
-# property can never collide on the username across iterations.
+# property can never collide on the username across iterations. The id's hex
+# digits (dashes dropped, kept within the 30-character limit) are a valid
+# username; 28 hex digits stay unique across a property run.
 def command_with_unique_username(command)
   Stweak::Domain::Accounts::CreateAccount.new(
     account_id: command.account_id,
-    username: Stweak::Domain::Accounts::Username.new(value: "user-#{command.account_id}"),
+    username: Stweak::Domain::Accounts::Username.new(value: "u-#{command.account_id.value.delete('-')[0, 28]}"),
     password: command.password,
     name: command.name,
     email: command.email

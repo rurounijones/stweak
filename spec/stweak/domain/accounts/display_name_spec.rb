@@ -25,9 +25,47 @@ RSpec.describe Stweak::Domain::Accounts::DisplayName do
     expect(display_name.to_stored).to eq('Ada Lovelace')
   end
 
+  it 'accepts spaces, punctuation and non-ASCII letters' do
+    expect(described_class.new(value: "Adá O'Brien-Smith").pii).to eq("Adá O'Brien-Smith")
+  end
+
+  it 'accepts the longest allowed length' do
+    expect(described_class.new(value: 'a' * 50).pii).to eq('a' * 50)
+  end
+
   it 'rejects an empty value' do
     expect { described_class.new(value: '') }
-      .to raise_error(Stweak::Domain::ValidationError, /name must not be empty/)
+      .to raise_error(Stweak::Domain::ValidationError, /not blank/)
+  end
+
+  it 'rejects an all-whitespace value' do
+    expect { described_class.new(value: '   ') }
+      .to raise_error(Stweak::Domain::ValidationError, /not blank/)
+  end
+
+  it 'rejects a value longer than fifty characters' do
+    expect { described_class.new(value: 'a' * 51) }
+      .to raise_error(Stweak::Domain::ValidationError, /at most 50 characters/)
+  end
+
+  it 'rejects a value containing a control character' do
+    expect { described_class.new(value: "Ada\tLovelace") }
+      .to raise_error(Stweak::Domain::ValidationError, /control characters/)
+  end
+
+  it 'rejects a value that is not valid UTF-8' do
+    expect { described_class.new(value: "Ada\xFF") }
+      .to raise_error(Stweak::Domain::ValidationError, /control characters/)
+  end
+
+  it 'does not quote the value in the rejection, since a display name is personal data' do
+    expect { described_class.new(value: 'A far too long secret name that runs well past the fifty limit') }
+      .to raise_error(Stweak::Domain::ValidationError,
+                      'name must be at most 50 characters, not blank, and free of control characters')
+  end
+
+  it 'wraps a stored value through from_stored without re-validating its shape' do
+    expect(described_class.from_stored("ciphertext\twith-controls").pii).to eq("ciphertext\twith-controls")
   end
 
   it 'is equal to a display name with the same value' do

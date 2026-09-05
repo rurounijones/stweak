@@ -27,7 +27,46 @@ RSpec.describe Stweak::Domain::Accounts::Email do
 
   it 'rejects an empty value' do
     expect { described_class.new(value: '') }
-      .to raise_error(Stweak::Domain::ValidationError, /email must not be empty/)
+      .to raise_error(Stweak::Domain::ValidationError, /separated by @/)
+  end
+
+  it 'rejects a value with no @' do
+    expect { described_class.new(value: 'example.com') }
+      .to raise_error(Stweak::Domain::ValidationError, /separated by @/)
+  end
+
+  it 'rejects a value with an empty local part' do
+    expect { described_class.new(value: '@example.com') }
+      .to raise_error(Stweak::Domain::ValidationError, /separated by @/)
+  end
+
+  it 'rejects a value with an empty domain' do
+    expect { described_class.new(value: 'ada@') }
+      .to raise_error(Stweak::Domain::ValidationError, /separated by @/)
+  end
+
+  it 'rejects a value with a second @' do
+    expect { described_class.new(value: 'ada@ex@ample.com') }
+      .to raise_error(Stweak::Domain::ValidationError, /separated by @/)
+  end
+
+  it 'rejects whitespace' do
+    expect { described_class.new(value: 'ada @example.com') }
+      .to raise_error(Stweak::Domain::ValidationError, /separated by @/)
+  end
+
+  it 'rejects a value that is not valid UTF-8' do
+    expect { described_class.new(value: "ada@\xFF") }
+      .to raise_error(Stweak::Domain::ValidationError, /separated by @/)
+  end
+
+  it 'does not quote the value in the rejection, since an email is personal data' do
+    expect { described_class.new(value: 'secret.person.example.com') }
+      .to raise_error(Stweak::Domain::ValidationError, 'email must be a local part and a domain separated by @')
+  end
+
+  it 'wraps a stored value through from_stored without re-validating its shape' do
+    expect(described_class.from_stored('not-an-address-ciphertext').pii).to eq('not-an-address-ciphertext')
   end
 
   it 'is equal to an email with the same value' do

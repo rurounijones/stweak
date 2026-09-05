@@ -229,10 +229,31 @@ The Account's own meaning-bearing strings are named for the same reason its id
 is. A `Username`, an `Email` and a `DisplayName` are each a value object rather
 than a bare `String`, threaded through `CreateAccount`, `AccountCreated` and the
 aggregate, so a method that wants an email cannot be handed a display name, and
-each type validates itself at construction — the non-emptiness rule lives on the
-type, not as a guard repeated in every command and event. The value objects
-collapse to their plain strings at every serialization boundary and are rebuilt
-on the way back, so nothing but the domain ever sees the wrapper.
+each type validates itself at construction — not just non-emptiness but shape:
+a `Username` is 3 to 30 characters of an ASCII handle alphabet, an `Email` is a
+local part and a domain separated by a single `@` with no whitespace, and a
+`DisplayName` is bounded in length, never blank and free of control characters.
+The rule lives on the type, not as a guard repeated in every command and event,
+so a malformed value — `email: "x"`, a username full of spaces — is
+unrepresentable rather than something a handler has to check for. The value
+objects collapse to their plain strings at every serialization boundary and are
+rebuilt on the way back, so nothing but the domain ever sees the wrapper.
+
+Construction and rehydration are deliberately not the same door. `.new`
+validates, because it is where a value arrives from outside the domain — a
+command a caller built — and a malformed one must be refused. Rebuilding a value
+from the store is a different act: the value was validated when it was first
+created, the log is trusted and append-only, and the two encrypted fields are
+read back as ciphertext, not as a well-formed name or address. So `Email` and
+`DisplayName` carry a second, trusting constructor, `from_stored`, that the
+read-back seam in `AccountCreated.from_h` uses in place of `.new`; it wraps the
+stored string as-is without re-checking its shape. This is the parse-versus-load
+distinction, and it is what lets the [encrypting store](#encryption-at-the-event-store-boundary)
+round-trip an event through `from_h` — its fields momentarily holding ciphertext
+— without the format rule rejecting bytes that are not meant to look like an
+address. The unencrypted value objects (`Username` and the ids) have no such
+seam: their stored form is always the real, once-valid value, so re-validating
+on read is harmless and kept.
 
 The two that carry personal data go one step further: they refuse to render
 themselves in the clear. An `Email` and a `DisplayName` are personal data, so
