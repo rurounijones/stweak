@@ -6,6 +6,8 @@ require 'stweak'
 require_relative 'domain/account_tracing'
 require_relative 'domain/aggregate_tracing'
 require_relative 'domain/create_account_handler_tracing'
+require_relative 'domain/lifecycle_account_tracing'
+require_relative 'domain/lifecycle_handler_tracing'
 require_relative 'domain/projection_system_tracing'
 
 module App
@@ -19,7 +21,10 @@ module App
         # @return [void]
         def install
           prepend_once(Stweak::Domain::Accounts::Account, AccountTracing)
+          prepend_once(Stweak::Domain::Accounts::Account, LifecycleAccountTracing)
           prepend_once(Stweak::Domain::Accounts::CreateAccountHandler, CreateAccountHandlerTracing)
+          prepend_once(Stweak::Domain::Accounts::DisableAccountHandler, LifecycleHandlerTracing)
+          prepend_once(Stweak::Domain::Accounts::DeleteAccountHandler, LifecycleHandlerTracing)
           prepend_once(Stweak::Domain::ProjectionSystem, ProjectionSystemTracing)
           prepend_once(Stweak::Domain::Aggregate.singleton_class, AggregateTracing)
         end

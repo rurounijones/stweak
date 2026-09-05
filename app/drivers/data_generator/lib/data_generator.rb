@@ -1,11 +1,10 @@
 # typed: strict
 # frozen_string_literal: true
 
-require 'faker'
 require 'opentelemetry'
-require 'securerandom'
 require 'sorbet-runtime'
 require 'stweak'
+require_relative 'commands'
 
 module DataGenerator
   # The generator: a caller that wraps the domain and produces plausible
@@ -68,21 +67,13 @@ module DataGenerator
 
     private
 
-    # A plausible create-account command: a fresh id and realistic fields from
-    # Faker. The username and email are unique per process, so no two generated
-    # accounts collide on the username the handler enforces.
+    # A plausible create-account command, shared with the LifecycleGenerator
+    # so both generators drive the domain the same way (see DataGenerator::Commands).
     #
     # @return [Stweak::Domain::Accounts::CreateAccount]
     sig { returns(Stweak::Domain::Accounts::CreateAccount) }
     def random_command
-      id = Stweak::Domain::Accounts::AccountId.new(value: SecureRandom.uuid)
-      Stweak::Domain::Accounts::CreateAccount.new(
-        account_id: id,
-        username: Stweak::Domain::Accounts::Username.new(value: Faker::Internet.unique.username),
-        password: Faker::Internet.password(min_length: 10, max_length: 20),
-        name: Stweak::Domain::Accounts::DisplayName.new(value: Faker::Name.name),
-        email: Stweak::Domain::Accounts::Email.new(value: Faker::Internet.unique.email)
-      )
+      DataGenerator::Commands.random_create
     end
   end
 end
