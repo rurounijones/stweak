@@ -16,6 +16,8 @@ require_relative '../../../support/property/domain_generators'
 # Concise builders for the account value objects, to keep examples short.
 def a_username(value) = Stweak::Domain::Accounts::Username.new(value: value)
 def a_display_name(value) = Stweak::Domain::Accounts::DisplayName.new(value: value)
+def a_password(value) = Stweak::Domain::Accounts::PasswordPlainText.new(value: value)
+def a_password_hash(value) = Stweak::Domain::Accounts::PasswordHash.new(value: value)
 
 ACCOUNT_OWNER_TYPE = Stweak::Domain::Accounts::Account
 ACCOUNT_ID = Stweak::Domain::Accounts::AccountId.new(value: '00000000-0000-4000-8000-000000000001')
@@ -28,7 +30,8 @@ def account_created_events(account_id, count)
   (1..count).map do |sequence|
     Stweak::Domain::Accounts::AccountCreated.new(
       stream_id: account_id, sequence: sequence, occurred_at: Time.utc(2026, 1, 2, 3, 4, 5), account_id: account_id,
-      username: Stweak::Domain::Accounts::Username.new(value: "user-#{sequence}"), password_hash: 'hash',
+      username: Stweak::Domain::Accounts::Username.new(value: "user-#{sequence}"),
+      password_hash: a_password_hash('hash'),
       name: Stweak::Domain::Accounts::DisplayName.new(value: "Name #{sequence}"),
       email: Stweak::Domain::Accounts::Email.new(value: "user#{sequence}@example.com")
     )
@@ -57,7 +60,7 @@ def build_create_account_command(account_id:, username: 'alice', password: 'hunt
   Stweak::Domain::Accounts::CreateAccount.new(
     account_id: account_id,
     username: Stweak::Domain::Accounts::Username.new(value: username),
-    password: password,
+    password: a_password(password),
     name: Stweak::Domain::Accounts::DisplayName.new(value: name),
     email: Stweak::Domain::Accounts::Email.new(value: email)
   )
@@ -118,7 +121,7 @@ RSpec.describe Stweak::Domain::Accounts::CreateAccountHandler do
     allow(checkpoint_store).to receive(:put)
     allow(event_store).to receive(:read_stream).and_return([])
     allow(usernames).to receive(:include?).and_return(false)
-    allow(password_hasher).to receive(:digest) { |password:| "digest-of-#{password}" }
+    allow(password_hasher).to receive(:digest) { |password:| a_password_hash("digest-of-#{password.plaintext}") }
     allow(event_store).to receive(:append) { |**call| appends << call }
   end
 
@@ -156,12 +159,12 @@ RSpec.describe Stweak::Domain::Accounts::CreateAccountHandler do
 
   it 'hashes the command password through the hasher' do
     handler.handle(build_create_account_command(account_id: ACCOUNT_ID))
-    expect(password_hasher).to have_received(:digest).with(password: 'hunter2')
+    expect(password_hasher).to have_received(:digest).with(password: a_password('hunter2'))
   end
 
   it 'stores the digest the hasher produced, never the raw password' do
     account = handler.handle(build_create_account_command(account_id: ACCOUNT_ID))
-    expect(account.password_hash).to eq('digest-of-hunter2')
+    expect(account.password_hash).to eq(a_password_hash('digest-of-hunter2'))
   end
 
   it 'stores the same digest in the event' do
@@ -198,7 +201,8 @@ RSpec.describe Stweak::Domain::Accounts::CreateAccountHandler do
   it 'returns the account for a retried create' do
     allow(event_store).to receive(:read_stream).and_return([account_created_events(ACCOUNT_ID, 1).first])
     retried = handler.handle(build_create_account_command(account_id: ACCOUNT_ID, username: 'user-1'))
-    expect(account_state(retried)).to eq([true, false, false, a_username('user-1'), a_display_name('Name 1'), 'hash'])
+    expect(account_state(retried))
+      .to eq([true, false, false, a_username('user-1'), a_display_name('Name 1'), a_password_hash('hash')])
   end
 
   it 'does not append a second event for a retried create' do

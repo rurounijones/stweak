@@ -79,7 +79,7 @@ module DomainObservabilityDoubles
     include Stweak::Domain::Security::PasswordHasher
 
     def digest(password:)
-      'digest'
+      Stweak::Domain::Accounts::PasswordHash.new(value: 'digest')
     end
   end
 
@@ -116,7 +116,8 @@ RSpec.describe App::Observability::Domain do
   let(:command) do
     Stweak::Domain::Accounts::CreateAccount.new(
       account_id: account_id, username: Stweak::Domain::Accounts::Username.new(value: 'alice'),
-      password: 'secret', name: Stweak::Domain::Accounts::DisplayName.new(value: 'Alice'),
+      password: Stweak::Domain::Accounts::PasswordPlainText.new(value: 'secret'),
+      name: Stweak::Domain::Accounts::DisplayName.new(value: 'Alice'),
       email: Stweak::Domain::Accounts::Email.new(value: 'alice@example.com')
     )
   end
@@ -138,7 +139,8 @@ RSpec.describe App::Observability::Domain do
     Stweak::Domain::Accounts::AccountCreated.new(
       stream_id: account_id, sequence: 1, occurred_at: Time.now,
       account_id: account_id, username: Stweak::Domain::Accounts::Username.new(value: 'alice'),
-      password_hash: 'hash', name: Stweak::Domain::Accounts::DisplayName.new(value: 'Alice'),
+      password_hash: Stweak::Domain::Accounts::PasswordHash.new(value: 'hash'),
+      name: Stweak::Domain::Accounts::DisplayName.new(value: 'Alice'),
       email: Stweak::Domain::Accounts::Email.new(value: 'alice@example.com')
     )
   end

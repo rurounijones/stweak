@@ -2,13 +2,13 @@
 # frozen_string_literal: true
 
 require 'sorbet-runtime'
-require_relative '../error'
 require_relative '../event'
 require_relative '../event_type'
 require_relative '../value_missing'
 require_relative 'account_id'
 require_relative 'display_name'
 require_relative 'email'
+require_relative 'password_hash'
 require_relative 'username'
 
 module Stweak
@@ -19,6 +19,10 @@ module Stweak
       # stored, the raw password never reaches the log. The display name and the
       # email are personal data and are encrypted at rest. created_at, the time
       # the event was committed, is stamped by the store just before the write.
+      #
+      # rubocop:disable Metrics/ClassLength -- the event carries five value-object
+      # fields and serializes, rehydrates and versions each of them; the length is
+      # that contract, not incidental bloat.
       class AccountCreated < Event
         # The schema version of this event. See "Event versioning" in the
         # design decisions.
@@ -37,7 +41,7 @@ module Stweak
         sig { returns(Username) }
         attr_reader :username
 
-        sig { returns(String) }
+        sig { returns(PasswordHash) }
         attr_reader :password_hash
 
         sig { returns(T.any(DisplayName, T.class_of(ValueMissing))) }
@@ -51,7 +55,7 @@ module Stweak
         # @param occurred_at [Time]
         # @param account_id [AccountId] the account created
         # @param username [Username]
-        # @param password_hash [String]
+        # @param password_hash [PasswordHash]
         # @param name [DisplayName, Stweak::Domain::ValueMissing] the display
         #   name, or ValueMissing if the account's data has been shredded
         # @param email [Email, Stweak::Domain::ValueMissing] the email, or
@@ -59,8 +63,8 @@ module Stweak
         # @param created_at [Time] when the event was committed, defaulting to
         #   occurred_at until the store stamps the true write time at append
         # @raise [Stweak::Domain::ValidationError] if the sequence is not
-        #   positive or the password hash is empty; the value objects validate
-        #   their own fields at their construction
+        #   positive; the value objects validate their own fields at their
+        #   construction
         # rubocop:disable Metrics/ParameterLists -- an event constructor carries every field it records
         sig do
           params(
@@ -69,7 +73,7 @@ module Stweak
             occurred_at: Time,
             account_id: AccountId,
             username: Username,
-            password_hash: String,
+            password_hash: PasswordHash,
             name: T.any(DisplayName, T.class_of(ValueMissing)),
             email: T.any(Email, T.class_of(ValueMissing)),
             created_at: Time
@@ -87,8 +91,6 @@ module Stweak
           created_at: occurred_at
         )
           super(stream_id: stream_id, sequence: sequence, occurred_at: occurred_at, created_at: created_at)
-          raise ValidationError, 'password hash must not be empty' if password_hash.empty?
-
           @account_id = account_id
           @username = username
           @password_hash = password_hash
@@ -127,7 +129,7 @@ module Stweak
           super.merge(
             'account_id' => account_id.to_s,
             'username' => username.to_s,
-            'password_hash' => password_hash,
+            'password_hash' => password_hash.to_stored,
             'name' => name.to_stored,
             'email' => email.to_stored
           )
@@ -144,12 +146,22 @@ module Stweak
         def self.from_h(hash)
           new(
             stream_id: AccountId.new(value: hash.fetch('stream_id')), sequence: hash.fetch('sequence'),
-            occurred_at: Time.iso8601(hash.fetch('occurred_at')), created_at: Time.iso8601(hash.fetch('created_at')),
+            occurred_at: time_from(hash, 'occurred_at'), created_at: time_from(hash, 'created_at'),
             account_id: AccountId.new(value: hash.fetch('account_id')),
             username: Username.new(value: hash.fetch('username')),
-            password_hash: hash.fetch('password_hash'),
+            password_hash: PasswordHash.new(value: hash.fetch('password_hash')),
             name: display_name_from(hash.fetch('name')), email: email_from(hash.fetch('email'))
           )
+        end
+
+        # Parse a serialized ISO 8601 timestamp field back into a Time.
+        #
+        # @param hash [Hash{String => Object}] the serialized event
+        # @param key [String] the field to read
+        # @return [Time]
+        sig { params(hash: T::Hash[String, T.untyped], key: String).returns(Time) }
+        private_class_method def self.time_from(hash, key)
+          Time.iso8601(hash.fetch(key))
         end
 
         # Re-wrap a serialized display name: a string becomes a DisplayName, the
@@ -182,6 +194,7 @@ module Stweak
           end
         end
       end
+      # rubocop:enable Metrics/ClassLength
     end
   end
 end

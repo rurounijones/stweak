@@ -80,7 +80,7 @@ module App
           {
             account_id: event.account_id.to_s,
             username: event.username.to_s,
-            password_hash: event.password_hash,
+            password_hash: event.password_hash.to_stored,
             # The value objects collapse to their strings for the row via
             # to_stored; a shredded name or email is ValueMissing, whose
             # to_stored passes the marker through — the form the encrypting

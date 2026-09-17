@@ -51,7 +51,8 @@ end
 def created_event(sequence, username, stream_id = ACCOUNT_ID)
   Stweak::Domain::Accounts::AccountCreated.new(
     stream_id: stream_id, sequence: sequence, occurred_at: OCCURRED_AT,
-    account_id: stream_id, username: Stweak::Domain::Accounts::Username.new(value: username), password_hash: 'hash',
+    account_id: stream_id, username: Stweak::Domain::Accounts::Username.new(value: username),
+    password_hash: Stweak::Domain::Accounts::PasswordHash.new(value: 'hash'),
     name: Stweak::Domain::Accounts::DisplayName.new(value: username),
     email: Stweak::Domain::Accounts::Email.new(value: "#{username}@example.com")
   )

@@ -10,6 +10,7 @@ require_relative 'account_disabled'
 require_relative 'account_deleted'
 require_relative 'display_name'
 require_relative 'email'
+require_relative 'password_hash'
 require_relative 'username'
 
 module Stweak
@@ -73,7 +74,7 @@ module Stweak
         sig { returns(T.any(Username, T.class_of(ValueMissing))) }
         attr_reader :username
 
-        sig { returns(String) }
+        sig { returns(T.any(PasswordHash, T.class_of(ValueMissing))) }
         attr_reader :password_hash
 
         sig { returns(T.any(DisplayName, T.class_of(ValueMissing))) }
@@ -89,15 +90,15 @@ module Stweak
           @created = T.let(false, T::Boolean)
           @disabled = T.let(false, T::Boolean)
           @deleted = T.let(false, T::Boolean)
-          @password_hash = T.let('', String)
-          # An account that has not been created yet has no username, name or
-          # email. The absence is ValueMissing rather than nil or an empty
-          # string: an observable, non-nil sentinel that a mutation cannot
-          # quietly stand in for, and the same marker a shredded field reads as.
-          # Declared untyped rather than the precise union type: a `T.let` type
-          # annotation has no runtime behaviour for mutation testing to pin.
-          # The readers above expose the precise type.
+          # An account that has not been created yet has no username, password
+          # hash, name or email. The absence is ValueMissing rather than nil or
+          # an empty string: an observable, non-nil sentinel that a mutation
+          # cannot quietly stand in for, and the same marker a shredded field
+          # reads as. Declared untyped rather than the precise union type: a
+          # `T.let` type annotation has no runtime behaviour for mutation testing
+          # to pin. The readers above expose the precise type.
           @username = T.let(ValueMissing, T.untyped)
+          @password_hash = T.let(ValueMissing, T.untyped)
           @name = T.let(ValueMissing, T.untyped)
           @email = T.let(ValueMissing, T.untyped)
         end
@@ -106,13 +107,13 @@ module Stweak
         # arriving here is already a hash.
         #
         # @param username [Username]
-        # @param password_hash [String]
+        # @param password_hash [PasswordHash]
         # @param name [DisplayName]
         # @param email [Email]
         # @param occurred_at [Time]
         # @raise [AccountAlreadyExists] if the account has already been created
         sig do
-          params(username: Username, password_hash: String, name: DisplayName,
+          params(username: Username, password_hash: PasswordHash, name: DisplayName,
                  email: Email, occurred_at: Time).void
         end
         def create(username:, password_hash:, name:, email:, occurred_at:)
@@ -181,7 +182,7 @@ module Stweak
         def checkpoint_state
           {
             'created' => @created, 'disabled' => @disabled, 'deleted' => @deleted,
-            'username' => @username.to_s, 'password_hash' => @password_hash,
+            'username' => @username.to_s, 'password_hash' => @password_hash.to_stored,
             'name' => @name.to_stored, 'email' => @email.to_stored
           }
         end
@@ -204,18 +205,26 @@ module Stweak
         #   checkpoint
         sig { override.params(state: T::Hash[String, T.untyped]).void }
         def restore(state)
-          name = state.fetch('name')
-          email = state.fetch('email')
-          @created = state.fetch('created')
-          @disabled = state.fetch('disabled', false)
-          @deleted = state.fetch('deleted', false)
+          restore_flags(state)
           @username = Username.new(value: state.fetch('username'))
-          @password_hash = state.fetch('password_hash')
-          @name = wrap_pii(name) { |string| DisplayName.new(value: string) }
-          @email = wrap_pii(email) { |string| Email.new(value: string) }
+          @password_hash = PasswordHash.new(value: state.fetch('password_hash'))
+          @name = wrap_pii(state.fetch('name')) { |string| DisplayName.new(value: string) }
+          @email = wrap_pii(state.fetch('email')) { |string| Email.new(value: string) }
         end
 
         private
+
+        # Restore the lifecycle flags from a checkpoint. The disabled and deleted
+        # flags default to false so a checkpoint taken before those events were
+        # modelled still restores.
+        #
+        # @param state [Hash{String => Object}] the serialized checkpoint state
+        sig { params(state: T::Hash[String, T.untyped]).void }
+        def restore_flags(state)
+          @created = state.fetch('created')
+          @disabled = state.fetch('disabled', false)
+          @deleted = state.fetch('deleted', false)
+        end
 
         # Apply an AccountCreated event, filling in the account's fields.
         #

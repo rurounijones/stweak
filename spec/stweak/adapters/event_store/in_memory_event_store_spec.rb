@@ -42,7 +42,7 @@ RSpec.describe Stweak::Adapters::EventStore::InMemoryEventStore do
       occurred_at: Time.utc(2026, 1, 2, 3, 4, 5),
       account_id: account_id,
       username: Stweak::Domain::Accounts::Username.new(value: 'alice'),
-      password_hash: 'hash',
+      password_hash: Stweak::Domain::Accounts::PasswordHash.new(value: 'hash'),
       name: Stweak::Domain::Accounts::DisplayName.new(value: 'Alice'),
       email: Stweak::Domain::Accounts::Email.new(value: 'alice@example.com')
     )
@@ -92,7 +92,8 @@ RSpec.describe Stweak::Adapters::EventStore::InMemoryEventStore do
     store.append(owner_type: owner_type, stream_id: account_id, expected_version: 0, events: [event])
     expect do
       store.append(owner_type: owner_type, stream_id: account_id, expected_version: 0, events: [second_event])
-    end.to raise_error(Stweak::Ports::ConcurrencyError)
+    end.to raise_error(Stweak::Ports::ConcurrencyError,
+                       "stream #{owner_type}##{account_id} is at version 1, not 0")
   end
 
   it 'accepts an append built on the current version' do
@@ -104,7 +105,8 @@ RSpec.describe Stweak::Adapters::EventStore::InMemoryEventStore do
   it 'refuses an out-of-sequence event' do
     expect do
       store.append(owner_type: owner_type, stream_id: account_id, expected_version: 0, events: [second_event])
-    end.to raise_error(Stweak::Ports::ConcurrencyError)
+    end.to raise_error(Stweak::Ports::ConcurrencyError,
+                       "stream #{owner_type}##{account_id}: event 2 is not the next event after 0")
   end
 
   it 'returns a copy so callers cannot mutate stored events' do

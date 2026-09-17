@@ -10,14 +10,15 @@ require_relative '../../../../lib/stweak/domain/accounts/account_deleted'
 def make_username(value) = Stweak::Domain::Accounts::Username.new(value: value)
 def make_display_name(value) = Stweak::Domain::Accounts::DisplayName.new(value: value)
 def make_email(value) = Stweak::Domain::Accounts::Email.new(value: value)
+def make_password_hash(value) = Stweak::Domain::Accounts::PasswordHash.new(value: value)
 
 # The time every example in this file creates accounts at.
 CREATED_AT = Time.utc(2026, 1, 2, 3, 4, 5)
 
 # Create an account with the given fields, defaulting to Alice's.
 def create_account_on(target, username: 'alice', password_hash: 'hash', name: 'Alice', email: 'alice@example.com')
-  target.create(username: make_username(username), password_hash: password_hash, name: make_display_name(name),
-                email: make_email(email), occurred_at: CREATED_AT)
+  target.create(username: make_username(username), password_hash: make_password_hash(password_hash),
+                name: make_display_name(name), email: make_email(email), occurred_at: CREATED_AT)
 end
 
 # Restore a checkpoint of Alice's account, overriding the shred-sensitive
@@ -47,7 +48,7 @@ end
 def build_created_event(account_id, occurred_at, sequence)
   Stweak::Domain::Accounts::AccountCreated.new(
     stream_id: account_id, sequence: sequence, occurred_at: occurred_at, account_id: account_id,
-    username: make_username("user-#{sequence}"), password_hash: 'hash',
+    username: make_username("user-#{sequence}"), password_hash: make_password_hash('hash'),
     name: make_display_name("Name #{sequence}"), email: make_email("user#{sequence}@example.com")
   )
 end
@@ -87,7 +88,7 @@ RSpec.describe Stweak::Domain::Accounts::Account do
   let(:created_event) do
     Stweak::Domain::Accounts::AccountCreated.new(
       stream_id: account_id, sequence: 1, occurred_at: occurred_at, account_id: account_id,
-      username: make_username('alice'), password_hash: 'hash',
+      username: make_username('alice'), password_hash: make_password_hash('hash'),
       name: make_display_name('Alice'), email: make_email('alice@example.com')
     )
   end
@@ -101,8 +102,8 @@ RSpec.describe Stweak::Domain::Accounts::Account do
       expect(account.username).to be(Stweak::Domain::ValueMissing)
     end
 
-    it 'has an empty password hash' do
-      expect(account.password_hash).to eq('')
+    it 'has no password hash' do
+      expect(account.password_hash).to be(Stweak::Domain::ValueMissing)
     end
 
     it 'has no name' do
@@ -137,7 +138,7 @@ RSpec.describe Stweak::Domain::Accounts::Account do
     end
 
     it 'exposes the password hash' do
-      expect(account.password_hash).to eq('hash')
+      expect(account.password_hash).to eq(make_password_hash('hash'))
     end
 
     it 'exposes the name' do
@@ -292,7 +293,7 @@ RSpec.describe Stweak::Domain::Accounts::Account do
     it 'restores its state from a checkpoint' do
       restore_alice(account)
       expect(state_fields(account)).to eq([true, false, false, make_username('alice'), make_display_name('Alice'),
-                                           make_email('alice@example.com'), 'hash'])
+                                           make_email('alice@example.com'), make_password_hash('hash')])
     end
 
     it 'restores a shredded name and email as the marker, not a value object' do

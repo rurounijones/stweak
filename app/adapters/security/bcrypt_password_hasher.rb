@@ -18,24 +18,30 @@ module App
 
       extend T::Sig
 
-      # @param password [String] the raw password
-      # @return [String] the bcrypt hash
-      sig { override.params(password: String).returns(String) }
+      # @param password [Stweak::Domain::Accounts::PasswordPlainText] the raw password
+      # @return [Stweak::Domain::Accounts::PasswordHash] the bcrypt hash
+      sig do
+        override.params(password: Stweak::Domain::Accounts::PasswordPlainText)
+                .returns(Stweak::Domain::Accounts::PasswordHash)
+      end
       def digest(password:)
         # to_s, not the BCrypt::Password object: the object's == compares a
         # plaintext candidate against the hash, which the port does not want.
-        BCrypt::Password.create(password).to_s
+        Stweak::Domain::Accounts::PasswordHash.new(value: BCrypt::Password.create(password.plaintext).to_s)
       end
 
-      # Verify a password against a bcrypt digest, returning false for an
+      # Verify a password against a bcrypt hash, returning false for an
       # invalid or incompatible stored value.
       #
-      # @param password [String] the raw password
-      # @param digest [String] the bcrypt hash
+      # @param password [Stweak::Domain::Accounts::PasswordPlainText] the raw password
+      # @param digest [Stweak::Domain::Accounts::PasswordHash] the bcrypt hash
       # @return [Boolean]
-      sig { override.params(password: String, digest: String).returns(T::Boolean) }
+      sig do
+        override.params(password: Stweak::Domain::Accounts::PasswordPlainText,
+                        digest: Stweak::Domain::Accounts::PasswordHash).returns(T::Boolean)
+      end
       def verify(password:, digest:)
-        BCrypt::Password.new(digest) == password
+        BCrypt::Password.new(digest.to_stored) == password.plaintext
       rescue BCrypt::Errors::InvalidHash
         false
       end

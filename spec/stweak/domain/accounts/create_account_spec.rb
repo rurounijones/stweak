@@ -9,22 +9,24 @@ require_relative '../../../support/property/generators'
 def make_username(value) = Stweak::Domain::Accounts::Username.new(value: value)
 def make_display_name(value) = Stweak::Domain::Accounts::DisplayName.new(value: value)
 def make_email(value) = Stweak::Domain::Accounts::Email.new(value: value)
+def make_password(value) = Stweak::Domain::Accounts::PasswordPlainText.new(value: value)
 
 # A CreateAccount command from raw strings, wrapping each field in its value
 # object. Defaults to Alice's, so an example overrides only what it cares about.
 def build_command(account_id:, username: 'alice', password: 'hunter2', name: 'Alice', email: 'alice@example.com')
   Stweak::Domain::Accounts::CreateAccount.new(
     account_id: Stweak::Domain::Accounts::AccountId.new(value: account_id), username: make_username(username),
-    password: password, name: make_display_name(name), email: make_email(email)
+    password: make_password(password), name: make_display_name(name), email: make_email(email)
   )
 end
 
-# A command must either be rejected at construction — its own empty-password
-# guard, or a value object rejecting an empty field — or hold its inputs
-# faithfully; the example tests pin which fields are which.
+# A command must either be rejected at construction — a value object rejecting
+# an empty or malformed field — or hold its inputs faithfully; the example tests
+# pin which fields are which. The password compares by its plaintext.
 def expect_construction_contract(account_id, username, password, name, email)
   command = build_command(account_id: account_id, username: username, password: password, name: name, email: email)
-  expect([command.account_id.to_s, command.username.to_s, command.password, command.name.pii, command.email.pii])
+  expect([command.account_id.to_s, command.username.to_s, command.password.plaintext,
+          command.name.pii, command.email.pii])
     .to eq([account_id, username, password, name, email])
 rescue Stweak::Domain::ValidationError
   nil
@@ -46,7 +48,7 @@ RSpec.describe Stweak::Domain::Accounts::CreateAccount do
   end
 
   it 'holds the password' do
-    expect(command.password).to eq('hunter2')
+    expect(command.password).to eq(make_password('hunter2'))
   end
 
   it 'holds the name' do

@@ -57,7 +57,8 @@ RSpec.describe WebAdmin::Reader do
         stream_id: account_id, expected_version: 0,
         events: [Stweak::Domain::Accounts::AccountCreated.new(
           stream_id: account_id, sequence: 1, occurred_at: now, account_id: account_id,
-          username: Stweak::Domain::Accounts::Username.new(value: username), password_hash: password_hash,
+          username: Stweak::Domain::Accounts::Username.new(value: username),
+          password_hash: Stweak::Domain::Accounts::PasswordHash.new(value: password_hash),
           name: Stweak::Domain::Accounts::DisplayName.new(value: name),
           email: Stweak::Domain::Accounts::Email.new(value: email)
         )]
@@ -91,8 +92,8 @@ RSpec.describe WebAdmin::Reader do
   end
 
   it 'authenticates a projected account' do
-    digest = password_hasher.digest(password: 'hunter2')
-    seed.call(username: 'ada', name: 'Ada', email: 'ada@example.com', password_hash: digest)
+    digest = password_hasher.digest(password: Stweak::Domain::Accounts::PasswordPlainText.new(value: 'hunter2'))
+    seed.call(username: 'ada', name: 'Ada', email: 'ada@example.com', password_hash: digest.to_stored)
 
     expect(reader.authenticate(username: 'ada', password: 'hunter2')).to include(username: 'ada')
   end
@@ -107,14 +108,16 @@ RSpec.describe WebAdmin::Reader do
     expect(reader.authenticate(username: 'missing', password: 'hunter2')).to be_nil
   end
 
-  it 'rejects an empty username without asking the domain' do
-    expect(reader.authenticate(username: '', password: 'hunter2')).to be_nil
-  end
-
   it 'rejects a malformed username without asking the domain' do
     seed.call(username: 'ada', name: 'Ada', email: 'ada@example.com')
 
     expect(reader.authenticate(username: 'a d a', password: 'hunter2')).to be_nil
+  end
+
+  it 'rejects an empty password without asking the domain' do
+    seed.call(username: 'ada', name: 'Ada', email: 'ada@example.com')
+
+    expect(reader.authenticate(username: 'ada', password: '')).to be_nil
   end
 
   it 'reads the events on an account stream, decrypted' do

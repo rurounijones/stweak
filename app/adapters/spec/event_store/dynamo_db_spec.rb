@@ -56,7 +56,8 @@ RSpec.describe App::Adapters::DynamoDBEventStore do
     Stweak::Domain::Accounts::AccountCreated.new(
       stream_id: ACCOUNT_ID, sequence: 1, occurred_at: OCCURRED_AT,
       account_id: ACCOUNT_ID, username: Stweak::Domain::Accounts::Username.new(value: 'alice'),
-      password_hash: 'hash', name: Stweak::Domain::Accounts::DisplayName.new(value: 'Alice'),
+      password_hash: Stweak::Domain::Accounts::PasswordHash.new(value: 'hash'),
+      name: Stweak::Domain::Accounts::DisplayName.new(value: 'Alice'),
       email: Stweak::Domain::Accounts::Email.new(value: 'alice@example.com')
     )
   end

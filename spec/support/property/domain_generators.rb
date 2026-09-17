@@ -48,7 +48,8 @@ module DomainPropertyGenerators
       .map do |(account_id, username, password, name, email)|
         Stweak::Domain::Accounts::CreateAccount.new(
           account_id: Stweak::Domain::Accounts::AccountId.new(value: account_id),
-          username: Stweak::Domain::Accounts::Username.new(value: username), password: password,
+          username: Stweak::Domain::Accounts::Username.new(value: username),
+          password: Stweak::Domain::Accounts::PasswordPlainText.new(value: password),
           name: Stweak::Domain::Accounts::DisplayName.new(value: name),
           email: Stweak::Domain::Accounts::Email.new(value: email)
         )
@@ -62,7 +63,8 @@ module DomainPropertyGenerators
     Stweak::Domain::Accounts::AccountCreated.new(
       stream_id: Stweak::Domain::Accounts::AccountId.new(value: stream_id), sequence: sequence,
       occurred_at: occurred_at, account_id: Stweak::Domain::Accounts::AccountId.new(value: account_id),
-      username: Stweak::Domain::Accounts::Username.new(value: username), password_hash: password_hash,
+      username: Stweak::Domain::Accounts::Username.new(value: username),
+      password_hash: Stweak::Domain::Accounts::PasswordHash.new(value: password_hash),
       name: Stweak::Domain::Accounts::DisplayName.new(value: name),
       email: Stweak::Domain::Accounts::Email.new(value: email)
     )

@@ -26,7 +26,9 @@ module DataGenerator
       Stweak::Domain::Accounts::CreateAccount.new(
         account_id: Stweak::Domain::Accounts::AccountId.new(value: SecureRandom.uuid),
         username: Stweak::Domain::Accounts::Username.new(value: random_username),
-        password: Faker::Internet.password(min_length: 10, max_length: 20),
+        password: Stweak::Domain::Accounts::PasswordPlainText.new(
+          value: Faker::Internet.password(min_length: 10, max_length: 20)
+        ),
         name: Stweak::Domain::Accounts::DisplayName.new(value: Faker::Name.name),
         email: Stweak::Domain::Accounts::Email.new(value: Faker::Internet.unique.email)
       )

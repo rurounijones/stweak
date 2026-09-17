@@ -8,6 +8,7 @@ require_relative '../../../../lib/stweak/domain/owner_registry'
 def make_username(value) = Stweak::Domain::Accounts::Username.new(value: value)
 def make_display_name(value) = Stweak::Domain::Accounts::DisplayName.new(value: value)
 def make_email(value) = Stweak::Domain::Accounts::Email.new(value: value)
+def make_password_hash(value) = Stweak::Domain::Accounts::PasswordHash.new(value: value)
 
 RSpec.describe Stweak::Domain::Accounts::AccountCreated do
   subject(:event) do
@@ -24,7 +25,7 @@ RSpec.describe Stweak::Domain::Accounts::AccountCreated do
       occurred_at: occurred_at,
       account_id: account_id,
       username: make_username('alice'),
-      password_hash: 'hash',
+      password_hash: make_password_hash('hash'),
       name: make_display_name('Alice'),
       email: make_email('alice@example.com')
     }
@@ -138,11 +139,6 @@ RSpec.describe Stweak::Domain::Accounts::AccountCreated do
   it 'rejects a non-positive sequence' do
     expect { described_class.new(**valid_attributes, sequence: 0) }
       .to raise_error(Stweak::Domain::ValidationError, /sequence/)
-  end
-
-  it 'rejects an empty password hash' do
-    expect { described_class.new(**valid_attributes, password_hash: '') }
-      .to raise_error(Stweak::Domain::ValidationError, /password hash/)
   end
 
   it 'accepts a name that has been shredded' do

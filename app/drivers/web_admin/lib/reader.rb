@@ -26,17 +26,22 @@ module WebAdmin
     end
 
     # Authenticate an account against the projected accounts table. The raw
-    # username arrives as a form string; it is wrapped in the domain's value
-    # object here, at the app boundary. A username the Username rule refuses is
-    # rejected as a failed login rather than built into a value object the
-    # domain would refuse — the login form's acceptance policy, which is the
-    # app's to make.
+    # username and password arrive as form strings; they are wrapped in the
+    # domain's value objects here, at the app boundary. An empty password, or a
+    # username the Username rule refuses, is rejected as a failed login rather
+    # than built into a value object the domain would refuse — the login form's
+    # acceptance policy, which is the app's to make.
     sig { params(username: String, password: String).returns(T.nilable(T::Hash[Symbol, T.untyped])) }
     def authenticate(username:, password:)
+      return if password.empty?
+
       name = parse_username(username)
       return unless name
 
-      @authenticator.call(username: name, password: password)
+      @authenticator.call(
+        username: name,
+        password: Stweak::Domain::Accounts::PasswordPlainText.new(value: password)
+      )
     end
 
     # Every account in the projection, ordered by username.

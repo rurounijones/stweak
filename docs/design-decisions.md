@@ -382,6 +382,31 @@ later without changing what is stored. The method is named `digest` rather than
 `hash` because `hash` collides with `Kernel#hash`, which would make an
 implementor unusable as a hash key.
 
+The port speaks value objects, not bare strings. `digest` takes a
+`PasswordPlainText` and returns a `PasswordHash`; `verify` takes both. This is
+[types over primitives](#types-over-primitives) applied at the most
+security-sensitive boundary in the domain: a signature that asks for a raw
+password cannot be handed a hash, the digest that goes into the event log is the
+digest that comes back out, and the two never trade places by being the same
+`String`. The two types validate for **coherence only** — each must be non-empty,
+and nothing more. That line is deliberate. Whether a password is *strong enough*
+— a minimum length, a mix of character classes, a rejection of known-breached
+values — is acceptance policy, not a shape invariant: it is mutable, it belongs
+to the application deciding what it will accept, and every non-empty string is a
+structurally coherent password. Length caps against a hashing denial of service
+are the hasher adapter's concern, at the boundary where the cost is paid. The
+domain likewise cannot validate a hash's *format*, because it does not know which
+algorithm produced it — PBKDF2 and bcrypt write different shapes, and choosing
+between them is the adapter's decision — so a `PasswordHash` is opaque: present
+or absent is all it checks. `PasswordPlainText` is a secret, so it masks itself
+in `to_s` and `inspect` and yields the real value only through a `plaintext`
+accessor named to make taking the secret out a deliberate act; it is a credential
+rather than personal data, so it has no `to_stored` and never reaches any store.
+`PasswordHash` is not personal data — it is already unreadable — so it is stored
+unencrypted, never crypto-shredded, renders plainly, and is rebuilt on read
+through its ordinary validating constructor, with no trusting `from_stored` seam
+of the kind the encrypted types carry.
+
 ## The handler is an application service
 
 `CreateAccountHandler` lives in the domain layer, not in a driving adapter. It

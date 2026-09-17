@@ -6,7 +6,9 @@ require_relative '../../../../lib/stweak/ports/projection_store'
 require_relative '../../../../lib/stweak/domain/security/password_hasher'
 require_relative '../../../../lib/stweak/domain/accounts/username'
 
-# Concise builder for the username value object the service speaks in.
+# Concise builders for the value objects the service speaks in.
+def pw(value) = Stweak::Domain::Accounts::PasswordPlainText.new(value: value)
+def ph(value) = Stweak::Domain::Accounts::PasswordHash.new(value: value)
 def un(value) = Stweak::Domain::Accounts::Username.new(value: value)
 
 RSpec.describe Stweak::Domain::Accounts::AuthenticateAccount do
@@ -28,21 +30,21 @@ RSpec.describe Stweak::Domain::Accounts::AuthenticateAccount do
   end
 
   it 'returns the matching account when the password verifies' do
-    allow(password_hasher).to receive(:verify).with(password: 'pw', digest: 'stored-digest').and_return(true)
+    allow(password_hasher).to receive(:verify).with(password: pw('pw'), digest: ph('stored-digest')).and_return(true)
 
-    expect(service.call(username: un('alice'), password: 'pw')).to eq(account)
+    expect(service.call(username: un('alice'), password: pw('pw'))).to eq(account)
   end
 
   it 'returns nil when no account has the username' do
     allow(password_hasher).to receive(:verify)
 
-    expect(service.call(username: un('nobody'), password: 'pw')).to be_nil
+    expect(service.call(username: un('nobody'), password: pw('pw'))).to be_nil
   end
 
   it 'does not attempt to verify when no account has the username' do
     allow(password_hasher).to receive(:verify)
 
-    service.call(username: un('nobody'), password: 'pw')
+    service.call(username: un('nobody'), password: pw('pw'))
 
     expect(password_hasher).not_to have_received(:verify)
   end
@@ -51,43 +53,43 @@ RSpec.describe Stweak::Domain::Accounts::AuthenticateAccount do
     allow(password_hasher).to receive(:verify)
     allow(projection_store).to receive(:read_all).with(table: :accounts).and_return([account.merge(disabled: true)])
 
-    expect(service.call(username: un('alice'), password: 'pw')).to be_nil
+    expect(service.call(username: un('alice'), password: pw('pw'))).to be_nil
   end
 
   it 'does not verify the password of a disabled account' do
     allow(password_hasher).to receive(:verify)
     allow(projection_store).to receive(:read_all).with(table: :accounts).and_return([account.merge(disabled: true)])
 
-    service.call(username: un('alice'), password: 'pw')
+    service.call(username: un('alice'), password: pw('pw'))
 
     expect(password_hasher).not_to have_received(:verify)
   end
 
   it 'authenticates an account whose disabled flag is present and false' do
-    allow(password_hasher).to receive(:verify).with(password: 'pw', digest: 'stored-digest').and_return(true)
+    allow(password_hasher).to receive(:verify).with(password: pw('pw'), digest: ph('stored-digest')).and_return(true)
     allow(projection_store).to receive(:read_all).with(table: :accounts).and_return([account.merge(disabled: false)])
 
-    expect(service.call(username: un('alice'), password: 'pw')).to eq(account.merge(disabled: false))
+    expect(service.call(username: un('alice'), password: pw('pw'))).to eq(account.merge(disabled: false))
   end
 
   it 'returns nil when the password does not verify against the found account' do
-    allow(password_hasher).to receive(:verify).with(password: 'pw', digest: 'stored-digest').and_return(false)
+    allow(password_hasher).to receive(:verify).with(password: pw('pw'), digest: ph('stored-digest')).and_return(false)
 
-    expect(service.call(username: un('alice'), password: 'pw')).to be_nil
+    expect(service.call(username: un('alice'), password: pw('pw'))).to be_nil
   end
 
   it 'verifies against the found account digest coerced to a string, not another account' do
     allow(password_hasher).to receive(:verify).and_return(true)
 
-    service.call(username: un('alice'), password: 'pw')
+    service.call(username: un('alice'), password: pw('pw'))
 
-    expect(password_hasher).to have_received(:verify).with(password: 'pw', digest: 'stored-digest')
+    expect(password_hasher).to have_received(:verify).with(password: pw('pw'), digest: ph('stored-digest'))
   end
 
   it 'skips a projected row that has no username rather than failing on it' do
     allow(projection_store).to receive(:read_all).with(table: :accounts).and_return([{ password_hash: 'x' }, account])
-    allow(password_hasher).to receive(:verify).with(password: 'pw', digest: 'stored-digest').and_return(true)
+    allow(password_hasher).to receive(:verify).with(password: pw('pw'), digest: ph('stored-digest')).and_return(true)
 
-    expect(service.call(username: un('alice'), password: 'pw')).to eq(account)
+    expect(service.call(username: un('alice'), password: pw('pw'))).to eq(account)
   end
 end

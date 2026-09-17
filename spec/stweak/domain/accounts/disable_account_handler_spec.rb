@@ -15,7 +15,8 @@ def disable_created_events(account_id, count)
   (1..count).map do |sequence|
     Stweak::Domain::Accounts::AccountCreated.new(
       stream_id: account_id, sequence: sequence, occurred_at: Time.utc(2026, 1, 2, 3, 4, 5), account_id: account_id,
-      username: Stweak::Domain::Accounts::Username.new(value: "user-#{sequence}"), password_hash: 'hash',
+      username: Stweak::Domain::Accounts::Username.new(value: "user-#{sequence}"),
+      password_hash: Stweak::Domain::Accounts::PasswordHash.new(value: 'hash'),
       name: Stweak::Domain::Accounts::DisplayName.new(value: "Name #{sequence}"),
       email: Stweak::Domain::Accounts::Email.new(value: "user#{sequence}@example.com")
     )

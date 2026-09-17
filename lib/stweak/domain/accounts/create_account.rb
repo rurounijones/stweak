@@ -3,10 +3,10 @@
 
 require 'sorbet-runtime'
 require_relative '../command'
-require_relative '../error'
 require_relative 'account_id'
 require_relative 'display_name'
 require_relative 'email'
+require_relative 'password_plain_text'
 require_relative 'username'
 
 module Stweak
@@ -25,7 +25,7 @@ module Stweak
         sig { returns(Username) }
         attr_reader :username
 
-        sig { returns(String) }
+        sig { returns(PasswordPlainText) }
         attr_reader :password
 
         sig { returns(DisplayName) }
@@ -36,18 +36,16 @@ module Stweak
 
         # @param account_id [AccountId] the account to create
         # @param username [Username]
-        # @param password [String] the raw password, hashed before storage
+        # @param password [PasswordPlainText] the raw password, hashed before
+        #   storage
         # @param name [DisplayName]
         # @param email [Email]
-        # @raise [Stweak::Domain::ValidationError] if the password is empty; the
-        #   value objects validate their own fields at their construction
         # rubocop:disable Lint/MissingSuper -- Command defines no initialize for this to call
         sig do
-          params(account_id: AccountId, username: Username, password: String, name: DisplayName, email: Email).void
+          params(account_id: AccountId, username: Username, password: PasswordPlainText,
+                 name: DisplayName, email: Email).void
         end
         def initialize(account_id:, username:, password:, name:, email:)
-          raise ValidationError, 'password must not be empty' if password.empty?
-
           @account_id = account_id
           @username = username
           @password = password

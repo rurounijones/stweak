@@ -94,7 +94,7 @@ RSpec.describe Stweak::Adapters::EventStore::EncryptingEventStore do
       occurred_at: Time.utc(2026, 1, 2, 3, 4, 5),
       account_id: account_id,
       username: Stweak::Domain::Accounts::Username.new(value: 'alice'),
-      password_hash: 'hash',
+      password_hash: Stweak::Domain::Accounts::PasswordHash.new(value: 'hash'),
       name: Stweak::Domain::Accounts::DisplayName.new(value: 'Alice'),
       email: Stweak::Domain::Accounts::Email.new(value: 'alice@example.com')
     )
@@ -196,6 +196,21 @@ RSpec.describe Stweak::Adapters::EventStore::EncryptingEventStore do
     yielded = []
     store.each_stream { |_owner, _id, events| yielded << events.map { |event| ignoring_created_at(event) } }
     expect(yielded).to eq([[created_event]])
+  end
+
+  it 'yields each stream with its owner type and id' do
+    store.append(owner_type: owner_type, stream_id: account_id, expected_version: 0, events: [created_event])
+    yielded = []
+    store.each_stream { |owner, id, _events| yielded << [owner, id] }
+    expect(yielded).to eq([[owner_type, account_id]])
+  end
+
+  it 'shreds the owner key when only some events in a batch request it' do
+    deleted = Stweak::Domain::Accounts::AccountDeleted
+              .new(stream_id: account_id, sequence: 2, occurred_at: created_event.occurred_at)
+    store.append(owner_type: owner_type, stream_id: account_id, expected_version: 0,
+                 events: [created_event, deleted])
+    expect(key_store.get(owner_type: owner_type, owner_id: account_id)).to be_nil
   end
 
   it 'publishes the plaintext events, never the ciphertext' do
