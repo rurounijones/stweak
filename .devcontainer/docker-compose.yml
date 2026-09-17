@@ -33,8 +33,11 @@ services:
 
   dynamodb-local:
     image: amazon/dynamodb-local:latest
+    # Published on 38000 to avoid clashing with anything the host may already
+    # run on 8000; inside the compose network it is still reached as
+    # dynamodb-local:8000, so the dev container and specs are unaffected.
     ports:
-      - '8000:8000'
+      - '38000:8000'
     # curl without -f: the local endpoint answers any HTTP request (even a
     # 400 for a GET), so a successful connection is enough to prove readiness.
     healthcheck:
@@ -45,8 +48,11 @@ services:
 
   elasticmq:
     image: softwaremill/elasticmq-native:latest
+    # Published on 39324 to avoid clashing with anything the host may already
+    # run on 9324; inside the compose network it is still reached as
+    # elasticmq:9324, so the dev container and specs are unaffected.
     ports:
-      - '9324:9324'
+      - '39324:9324'
     # ElasticMQ answers only SQS requests (a plain GET is a 400), so readiness
     # is a TCP connect to the port, which the image's busybox nc provides.
     healthcheck:
@@ -57,11 +63,11 @@ services:
 
   redis:
     image: redis:7-alpine
-    # Published on 6381 to avoid clashing with other Redis containers a host may
-    # already run on 6379; inside the compose network it is still reached as
+    # Published on 36379 to avoid clashing with anything the host may already
+    # run on 6379; inside the compose network it is still reached as
     # redis:6379, so the dev container and specs are unaffected.
     ports:
-      - '6381:6379'
+      - '36379:6379'
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
@@ -74,8 +80,11 @@ services:
   openobserve:
     image: public.ecr.aws/zinclabs/openobserve:latest
     container_name: openobserve
+    # Published on 35080 to avoid clashing with anything the host may already
+    # run on 5080; inside the compose network it is still reached as
+    # openobserve:5080, so the drivers' OTLP exporter is unaffected.
     ports:
-      - "5080:5080"
+      - '35080:5080'
     volumes:
       - /tmp/openobserve_data:/data
     environment:

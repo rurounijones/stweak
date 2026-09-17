@@ -37,7 +37,11 @@ holds each driving application (each its own bundle). Commands run per bundle:
       bash -lc 'cd app/drivers/data_generator && bundle install && bundle exec rspec'
 
 The adapters reach the services on `localhost` (DynamoDB Local on 8000,
-ElasticMQ on 9324, Redis on 6379).
+ElasticMQ on 9324, Redis on 6379). The compose file publishes those services
+on the host under a `3xxxx` offset (38000, 39324, 36379) so nothing clashes
+with other stacks the host may already run on the standard ports; the offset
+is host-side only, and everything inside the compose network still uses the
+standard ports.
 
 ### Driver configuration
 
@@ -79,7 +83,7 @@ stores.
 ### Tracing the drivers
 
 The compose stack includes OpenObserve, which receives OpenTelemetry traces
-from the two drivers. Its UI is at <http://localhost:5080> (log in with
+from the two drivers. Its UI is at <http://localhost:35080> (log in with
 `root@example.com` / `Root123!`). Tracing is off by default and touches only the
 drivers, never the specs or the app-area adapters.
 
