@@ -1,0 +1,11 @@
+# Advisories accepted for now. Each entry must say why it is accepted and what
+# would remove it, so the list shrinks rather than quietly growing.
+ignore:
+  # rubyzip 2.4.1 path traversal (High), fixed in 3.4.0. Pulled in only by
+  # license_finder 7.2.1, which caps rubyzip below 3 (`>= 1, < 3`), so a bundle
+  # update cannot reach the fix. license_finder does open third-party package
+  # archives (nuget, installed gem notice/license files), so this is reachable
+  # in principle from a malicious package, though only in the dev/CI licence
+  # check, never in the shipped domain gem. Remove this entry once license_finder
+  # allows rubyzip 3.x or the licence check moves to a different tool.
+  - CVE-2026-85396
