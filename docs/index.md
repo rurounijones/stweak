@@ -19,7 +19,8 @@ defined in the [glossary][glossary].
 
 Under way, with the write path built and the read path following it. The Account
 write side is complete — the `CreateAccount` command, its handler and aggregate,
-event versioning, checkpointing and crypto-shredding — and the projection system
+event versioning, checkpointing, crypto-shredding, and disabling and deleting an
+Account — and the projection system
 builds read models from the event log. Every collaborator has both of its
 implementations: an in-memory adapter in the gem, and a durable twin in the app
 area — a DynamoDB event store, Redis key and checkpoint stores, an SQLite
